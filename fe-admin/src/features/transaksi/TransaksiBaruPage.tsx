@@ -41,17 +41,21 @@ const schema = z.object({
   quantity: z.coerce.number().min(1),
   mata_ayam: z.string().optional(),
   payment_method: z.enum(['pay_now', 'dp', 'pay_later']),
+  payment_channel: z.enum(['transfer', 'cash']).optional(),
   dp_amount: z.coerce.number().optional(),
 }).superRefine((d, ctx) => {
   if (d.payment_method === 'dp' && (!d.dp_amount || d.dp_amount <= 0)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Masukkan jumlah DP', path: ['dp_amount'] });
   }
+  if ((d.payment_method === 'pay_now' || d.payment_method === 'dp') && !d.payment_channel) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Pilih metode pembayaran (transfer/tunai)', path: ['payment_channel'] });
+  }
 });
 type FormData = z.infer<typeof schema>;
 
 const PAYMENT_OPTIONS = [
-  { value: 'pay_now' as const, title: 'Bayar Penuh', desc: 'Upload bukti transfer sekarang.', Icon: Wallet },
-  { value: 'dp' as const, title: 'Bayar DP', desc: 'Bayar uang muka, sisa sebelum diambil.', Icon: CreditCard },
+  { value: 'pay_now' as const, title: 'Bayar Penuh', desc: 'Pilih transfer atau tunai.', Icon: Wallet },
+  { value: 'dp' as const, title: 'Bayar DP', desc: 'Pilih transfer atau tunai, sisa sebelum diambil.', Icon: CreditCard },
   { value: 'pay_later' as const, title: 'Bayar Nanti', desc: 'Simpan dulu, bayar maks 1×24 jam.', Icon: Clock },
 ];
 
@@ -74,11 +78,12 @@ export default function TransaksiBaruPage() {
 
   const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { nama_customer: '', no_hp: '', alamat: '', kode_bahan: '', panjang: 1, lebar: 1, quantity: 1, mata_ayam: 'none', payment_method: undefined as unknown as 'pay_now' | 'dp' | 'pay_later' },
+    defaultValues: { nama_customer: '', no_hp: '', alamat: '', kode_bahan: '', panjang: 1, lebar: 1, quantity: 1, mata_ayam: 'none', payment_method: undefined as unknown as 'pay_now' | 'dp' | 'pay_later', payment_channel: undefined },
   });
 
   const paymentMethod = watch('payment_method');
-  const needsProof = paymentMethod === 'pay_now' || paymentMethod === 'dp';
+  const paymentChannel = watch('payment_channel');
+  const needsProof = (paymentMethod === 'pay_now' || paymentMethod === 'dp') && paymentChannel === 'transfer';
 
   useEffect(() => {
     Promise.all([bahanService.getAll(), mataAyamService.getAll()]).then(([m, e]) => {
@@ -99,8 +104,15 @@ export default function TransaksiBaruPage() {
 
   useEffect(() => {
     if (paymentMethod !== 'dp') { setDpDisplay(''); setValue('dp_amount', undefined); }
-    if (paymentMethod === 'pay_later') setProofFile(undefined);
+    if (paymentMethod === 'pay_later') {
+      setValue('payment_channel', undefined);
+      setProofFile(undefined);
+    }
   }, [paymentMethod, setValue]);
+
+  useEffect(() => {
+    if (!needsProof) setProofFile(undefined);
+  }, [needsProof]);
 
   const onDrop = useCallback((accepted: File[]) => { if (accepted[0]) setProofFile(accepted[0]); }, []);
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -163,6 +175,11 @@ export default function TransaksiBaruPage() {
 
   const onSubmit = async (form: FormData) => {
     try {
+      if (needsProof && !proofFile) {
+        toast.error('Upload bukti transfer terlebih dahulu');
+        return;
+      }
+
       const itemsPayload = orderItems.length > 0
         ? orderItems.map((item) => ({
           kode_bahan: item.kode_bahan,
@@ -328,6 +345,20 @@ export default function TransaksiBaruPage() {
                     <Input inputMode="numeric" placeholder="Contoh: 150.000" value={dpDisplay} onChange={handleDpChange} className="pl-9" />
                   </div>
                   {errors.dp_amount && <p className="text-xs text-destructive">{errors.dp_amount.message}</p>}
+                </div>
+              )}
+
+              {(paymentMethod === 'pay_now' || paymentMethod === 'dp') && (
+                <div className="space-y-1.5">
+                  <Label>Metode Bayar</Label>
+                  <Select value={paymentChannel} onValueChange={(v) => setValue('payment_channel', v as 'transfer' | 'cash', { shouldValidate: true })}>
+                    <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Pilih metode bayar" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="transfer">Transfer</SelectItem>
+                      <SelectItem value="cash">Tunai</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {errors.payment_channel && <p className="text-xs text-destructive">{errors.payment_channel.message}</p>}
                 </div>
               )}
 

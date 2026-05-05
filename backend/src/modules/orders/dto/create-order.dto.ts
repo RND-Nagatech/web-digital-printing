@@ -1,4 +1,4 @@
-import { ArrayMinSize, IsArray, IsNumber, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMinSize, IsArray, IsIn, IsNumber, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
 import { plainToInstance, Transform, Type } from 'class-transformer';
 
 export class CreateOrderItemDto {
@@ -56,5 +56,7 @@ export class CreateOrderDto {
   items?: CreateOrderItemDto[];
 
   @IsOptional() @IsString() @MaxLength(500) notes?: string;
+  @IsOptional() @IsIn(['pay_now', 'dp', 'pay_later']) payment_method?: 'pay_now' | 'dp' | 'pay_later';
+  @IsOptional() @IsIn(['transfer', 'cash']) payment_channel?: 'transfer' | 'cash';
   @IsOptional() @Type(() => Number) @IsNumber() @Min(0) dp_amount?: number;
 }

@@ -19,6 +19,7 @@ export interface CreateOrderRequestDto {
     mata_ayam?: string;
   }>;
   payment_method?: 'pay_now' | 'dp' | 'pay_later';
+  payment_channel?: 'transfer' | 'cash';
   dp_amount?: number;
 }
 

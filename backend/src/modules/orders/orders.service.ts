@@ -132,13 +132,48 @@ export class OrdersService {
 
     const harga_total = items.reduce((sum, item) => sum + item.subtotal, 0);
     const firstItem = items[0];
-    const isDp = !!paymentProof && !!dto.dp_amount && dto.dp_amount > 0 && dto.dp_amount < harga_total;
-    const isFullPaid = !!paymentProof && !isDp;
-    const payment_status = isDp ? 'dp' : isFullPaid ? 'paid' : 'unpaid';
-    const payment_settlement_method = paymentProof ? 'transfer' : undefined;
-    const dp_amount = isDp ? dto.dp_amount! : isFullPaid ? harga_total : 0;
-    const sisa = isDp ? harga_total - dto.dp_amount! : 0;
-    const dibayar = isDp ? dp_amount : isFullPaid ? harga_total : 0;
+
+    let payment_status: 'unpaid' | 'dp' | 'paid' = 'unpaid';
+    let payment_settlement_method: 'transfer' | 'cash' | undefined;
+    let dp_amount = 0;
+    let sisa = 0;
+    let dibayar = 0;
+
+    if (dto.payment_method === 'pay_now' || dto.payment_method === 'dp') {
+      const channel: 'transfer' | 'cash' = dto.payment_channel ?? (paymentProof ? 'transfer' : 'cash');
+      if (channel === 'transfer' && !paymentProof) {
+        throw new BadRequestException('Bukti transfer wajib diupload untuk metode ini');
+      }
+
+      payment_settlement_method = channel;
+
+      if (dto.payment_method === 'pay_now') {
+        payment_status = 'paid';
+        dp_amount = harga_total;
+        dibayar = harga_total;
+        sisa = 0;
+      } else {
+        if (!dto.dp_amount || dto.dp_amount <= 0) {
+          throw new BadRequestException('Masukkan jumlah DP');
+        }
+        if (dto.dp_amount >= harga_total) {
+          throw new BadRequestException('Jumlah DP harus lebih kecil dari total transaksi');
+        }
+        payment_status = 'dp';
+        dp_amount = dto.dp_amount;
+        dibayar = dto.dp_amount;
+        sisa = harga_total - dto.dp_amount;
+      }
+    } else {
+      // Backward compatibility for checkout payloads that don't send payment_method.
+      const isDp = !!paymentProof && !!dto.dp_amount && dto.dp_amount > 0 && dto.dp_amount < harga_total;
+      const isFullPaid = !!paymentProof && !isDp;
+      payment_status = isDp ? 'dp' : isFullPaid ? 'paid' : 'unpaid';
+      payment_settlement_method = paymentProof ? 'transfer' : undefined;
+      dp_amount = isDp ? dto.dp_amount! : isFullPaid ? harga_total : 0;
+      sisa = isDp ? harga_total - dto.dp_amount! : 0;
+      dibayar = isDp ? dp_amount : isFullPaid ? harga_total : 0;
+    }
     const no_faktur = await this.generateNoFaktur();
 
     const createdAt = new Date();
