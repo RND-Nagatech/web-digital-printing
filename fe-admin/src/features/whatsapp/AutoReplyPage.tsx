@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { whatsappService } from '@/services/whatsapp.service';
 import { AutoReplyRule } from '@/types/order';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 const schema = z.object({
   keyword: z.string().trim().min(1, 'Kata kunci wajib diisi').max(100),
@@ -60,6 +61,8 @@ export default function AutoReplyPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, query]);
+
+  useAutoRefresh(load, { intervalMs: 10_000 });
 
   useEffect(() => {
     setPage(1);

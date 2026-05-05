@@ -10,6 +10,7 @@ import { ROLES } from "@/utils/constants";
 import { Role } from "@/types/user";
 import { roleService } from "@/services/role.service";
 import { useAuthStore } from "@/store/auth.store";
+import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 
 type RoleAccessRow = {
   id: string;
@@ -73,27 +74,31 @@ export default function HakAksesPage() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
 
+  const loadRoles = async () => {
+    const rows = await roleService.getAll();
+    const normalized: RoleAccessRow[] = rows
+      .map((row) => ({
+        id: row._id,
+        role: row.name as Role,
+        permissions: row.permissions ?? [],
+      }))
+      .filter((row) => ROLE_ORDER.includes(row.role))
+      .sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
+
+    const nextPerms: Record<Role, string[]> = { admin: [], owner: [], kasir: [] };
+    normalized.forEach((row) => {
+      nextPerms[row.role] = [...row.permissions];
+    });
+
+    setRoles(normalized);
+    setPerms(nextPerms);
+  };
+
   useEffect(() => {
     const run = async () => {
       try {
         setLoading(true);
-        const rows = await roleService.getAll();
-        const normalized: RoleAccessRow[] = rows
-          .map((row) => ({
-            id: row._id,
-            role: row.name as Role,
-            permissions: row.permissions ?? [],
-          }))
-          .filter((row) => ROLE_ORDER.includes(row.role))
-          .sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
-
-        const nextPerms: Record<Role, string[]> = { admin: [], owner: [], kasir: [] };
-        normalized.forEach((row) => {
-          nextPerms[row.role] = [...row.permissions];
-        });
-
-        setRoles(normalized);
-        setPerms(nextPerms);
+        await loadRoles();
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Gagal memuat hak akses';
         toast.error(message);
@@ -104,6 +109,11 @@ export default function HakAksesPage() {
 
     void run();
   }, []);
+
+  useAutoRefresh(async () => {
+    if (saving) return;
+    await loadRoles();
+  }, { intervalMs: 10_000, enabled: !loading });
 
   const hasItemPermission = (role: Role, item: AccessItem) =>
     item.permissions.every((permission) => perms[role]?.includes(permission));
@@ -171,19 +181,7 @@ export default function HakAksesPage() {
         }),
       );
 
-      const refreshed = await roleService.getAll();
-      const normalized: RoleAccessRow[] = refreshed
-        .map((row) => ({ id: row._id, role: row.name as Role, permissions: row.permissions ?? [] }))
-        .filter((row) => ROLE_ORDER.includes(row.role))
-        .sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role));
-
-      const nextPerms: Record<Role, string[]> = { admin: [], owner: [], kasir: [] };
-      normalized.forEach((row) => {
-        nextPerms[row.role] = [...row.permissions];
-      });
-
-      setRoles(normalized);
-      setPerms(nextPerms);
+      await loadRoles();
       toast.success('Hak akses berhasil disimpan');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal menyimpan hak akses';

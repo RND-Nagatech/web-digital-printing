@@ -180,7 +180,7 @@ const OrderHistoryPage = () => {
                 </div>
             </div>
 
-            <div className="grid gap-5 lg:grid-cols-[360px_1fr]">
+            <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
                 <section className="flex h-full min-h-0 flex-col rounded-xl border bg-card p-4">
                     <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <p className="font-semibold">Daftar Pesanan</p>
@@ -270,7 +270,7 @@ const OrderHistoryPage = () => {
                                 <div className="rounded-lg border bg-secondary/20 p-4">
                                     <p className="mb-3 text-sm font-semibold">Progress Pengerjaan</p>
                                     <div className="overflow-x-auto pb-2">
-                                        <div className="min-w-[480px] px-2">
+                                        <div className="min-w-[360px] px-2 md:min-w-[480px]">
                                             <div className="relative pt-1">
                                                 <div className="absolute left-10 right-10 top-6 border-t border-dashed border-border" />
                                                 <div className="relative grid grid-cols-4 gap-2">
@@ -354,7 +354,7 @@ const OrderHistoryPage = () => {
                                 <p className="mb-3 text-sm font-semibold">Item Pesanan</p>
                                 <div className="space-y-2">
                                     {(selected.items?.length ? selected.items : []).map((item, idx) => (
-                                        <div key={`${selected.id}-${idx}`} className="flex items-start justify-between gap-3 rounded-md bg-secondary/20 px-3 py-2 text-sm">
+                                        <div key={`${selected.id}-${idx}`} className="flex flex-wrap items-start justify-between gap-3 rounded-md bg-secondary/20 px-3 py-2 text-sm">
                                             <div>
                                                 <p className="font-medium">{item.nama_bahan}</p>
                                                 <p className="text-muted-foreground">
@@ -362,7 +362,7 @@ const OrderHistoryPage = () => {
                                                     {item.mata_ayam ? ` • ${item.mata_ayam}` : ''}
                                                 </p>
                                             </div>
-                                            <p className="font-semibold">{formatIDR(item.subtotal)}</p>
+                                            <p className="font-semibold sm:ml-auto">{formatIDR(item.subtotal)}</p>
                                         </div>
                                     ))}
                                     {(!selected.items || selected.items.length === 0) && (

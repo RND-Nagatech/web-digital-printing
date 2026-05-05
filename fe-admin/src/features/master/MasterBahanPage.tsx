@@ -18,6 +18,7 @@ import { bahanService } from '@/services/master.service';
 import { Material } from '@/types/material';
 import { formatIDR } from '@/utils/formatters';
 import { MaterialNeedsReactivateDto } from '@/types/dto/materials.dto';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 const schema = z.object({
   code: z.string().trim().min(1),
@@ -76,6 +77,8 @@ export default function MasterBahanPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, search]);
+
+  useAutoRefresh(load, { intervalMs: 10_000 });
 
   useEffect(() => {
     setPage(1);

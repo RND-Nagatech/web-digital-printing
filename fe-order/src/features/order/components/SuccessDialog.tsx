@@ -17,7 +17,7 @@ export const SuccessDialog = ({ order, onClose, onNew, onPrint }: Props) => {
   const isDp = order?.payment_status === 'dp';
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
         <DialogHeader>
           <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
             {isPaid

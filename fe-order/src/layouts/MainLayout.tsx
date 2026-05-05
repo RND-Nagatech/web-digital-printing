@@ -15,6 +15,7 @@ export const MainLayout = ({ children }: Props) => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const clearAuth = useAuthStore((s) => s.clearAuth);
   const [cartCount, setCartCount] = useState(0);
+  const isOrderHistoryActive = location.pathname === '/riwayat-pesanan';
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -51,7 +52,7 @@ export const MainLayout = ({ children }: Props) => {
   return (
     <div className="flex min-h-screen flex-col bg-gradient-surface">
       <header className="sticky top-0 z-40 border-b border-border/60 bg-background/80 backdrop-blur-lg">
-        <div className="container flex h-16 items-center justify-between">
+        <div className="container flex min-h-16 flex-wrap items-center justify-between gap-3 py-2">
           <Link to="/" className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-primary shadow-glow">
               <Printer className="h-5 w-5 text-primary-foreground" />
@@ -67,17 +68,24 @@ export const MainLayout = ({ children }: Props) => {
 
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {isAuthenticated ? (
               <>
                 <button
                   type="button"
                   onClick={() => navigate('/riwayat-pesanan')}
-                  className={`inline-flex items-center justify-center p-0 ${location.pathname === '/riwayat-pesanan' ? 'text-primary' : 'text-foreground'} hover:text-primary`}
+                  className={`group inline-flex items-center justify-center p-0 ${isOrderHistoryActive ? 'text-primary' : 'text-foreground'} hover:text-primary`}
                   title="Riwayat Pesanan"
                   aria-label="Riwayat Pesanan"
                 >
-                  <img src={pesananIcon} alt="Pesanan" className="h-5 w-5 object-contain" loading="lazy" />
+                  <img
+                    src={pesananIcon}
+                    alt="Pesanan"
+                    className={`h-5 w-5 object-contain transition ${isOrderHistoryActive
+                      ? '[filter:invert(41%)_sepia(92%)_saturate(1658%)_hue-rotate(157deg)_brightness(94%)_contrast(92%)]'
+                      : 'group-hover:[filter:invert(41%)_sepia(92%)_saturate(1658%)_hue-rotate(157deg)_brightness(94%)_contrast(92%)]'}`}
+                    loading="lazy"
+                  />
                 </button>
                 <button
                   id="cart-button"
@@ -95,7 +103,8 @@ export const MainLayout = ({ children }: Props) => {
                   )}
                 </button>
                 <Button variant="ghost" size="sm" onClick={onLogout} title="Logout">
-                  <LogOut className="mr-2 h-4 w-4" /> {user?.username ?? 'Logout'}
+                  <LogOut className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">{user?.username ?? 'Logout'}</span>
                 </Button>
               </>
             ) : (

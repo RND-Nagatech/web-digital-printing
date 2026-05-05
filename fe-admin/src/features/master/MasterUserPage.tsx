@@ -18,6 +18,7 @@ import { userService } from "@/services/user.service";
 import { User, Role } from "@/types/user";
 import { ROLES } from "@/utils/constants";
 import { formatDate } from "@/utils/formatters";
+import { useAutoRefresh } from "@/hooks/use-auto-refresh";
 
 const schema = z.object({
   name: z.string().trim().min(2).max(100),
@@ -68,6 +69,8 @@ export default function MasterUserPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, search]);
+
+  useAutoRefresh(load, { intervalMs: 10_000 });
 
   useEffect(() => { setPage(1); }, [search, limit]);
 

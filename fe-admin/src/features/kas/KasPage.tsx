@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { kasService } from '@/services/kas.service';
 import { CashEntry } from '@/types/order';
 import { formatIDR, formatDate } from '@/utils/formatters';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 const schema = z.object({
   type: z.enum(['PEMASUKAN', 'PENGELUARAN']),
@@ -76,6 +77,9 @@ export default function KasPage() {
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter, page, limit, search]);
   useEffect(() => { kasService.getAll().then(setAllCash); }, []);
+  useAutoRefresh(async () => {
+    await Promise.all([load(), kasService.getAll().then(setAllCash)]);
+  }, { intervalMs: 10_000 });
   useEffect(() => { setPage(1); }, [search, limit]);
 
   const chartData = useMemo(() => {

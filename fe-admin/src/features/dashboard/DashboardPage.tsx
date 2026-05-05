@@ -7,6 +7,7 @@ import { transaksiService } from '@/services/transaksi.service';
 import { Order } from '@/types/order';
 import { formatIDR, formatDate } from '@/utils/formatters';
 import { StatusBadge } from '@/components/common/StatusBadge';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 function calcTrend(current: number, prev: number) {
   if (prev === 0) return current > 0 ? 100 : 0;
@@ -15,9 +16,15 @@ function calcTrend(current: number, prev: number) {
 
 export default function DashboardPage() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const load = async () => {
+    const r = await transaksiService.getPaged({ limit: 1000 });
+    setOrders(r.items as Order[]);
+  };
+
   useEffect(() => {
-    transaksiService.getPaged({ limit: 1000 }).then((r) => setOrders(r.items as Order[]));
+    void load();
   }, []);
+  useAutoRefresh(load, { intervalMs: 10_000 });
 
   const now = new Date();
   const activeYear = now.getFullYear();

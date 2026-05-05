@@ -17,6 +17,7 @@ import { Order, OrderStatus } from '@/types/order';
 import { ORDER_STATUSES } from '@/utils/constants';
 import { formatIDR, formatDateTime } from '@/utils/formatters';
 import { OrderDetailDialog } from './OrderDetailDialog';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 import reprintIcon from '@/assets/reprint_icon.png';
 import lunasIcon from '@/assets/lunas_icon.png';
 import belumLunasIcon from '@/assets/belum_lunas_icon.png';
@@ -68,6 +69,7 @@ export default function TransaksiPage() {
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [page, limit, search, status, appliedDate]);
+  useAutoRefresh(load, { intervalMs: 10_000 });
   useEffect(() => { setPage(1); }, [search, status, limit, appliedDate]);
   useEffect(() => {
     void bahanService.getAll().then((materials) => {

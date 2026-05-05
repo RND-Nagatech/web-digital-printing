@@ -14,6 +14,7 @@ import { storeService } from '@/services/store.service';
 import { formatIDR, formatNumber } from '@/utils/formatters';
 import { getPdfEngine } from './export-engine/lazy';
 import { exportExcelWithWorker } from './export-engine/excel-worker.client';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 const TODAY = new Date().toISOString().slice(0, 10);
 
@@ -28,6 +29,17 @@ export default function LaporanManagerialBahanPage() {
     const [summary, setSummary] = useState({ total_materials: 0, total_qty: 0, total_revenue: 0 });
     const [filterError, setFilterError] = useState('');
 
+    const loadReport = async () => {
+        const res = await laporanService.getTopMaterials({
+            from,
+            to,
+            search: search.trim() || undefined,
+            limit: Number(limit),
+        });
+        setItems(res.items);
+        setSummary(res.summary);
+    };
+
     const onSearch = async () => {
         if (!from || !to) {
             setFilterError('Silahkan pilih tanggal awal dan tanggal akhir terlebih dahulu.');
@@ -41,20 +53,18 @@ export default function LaporanManagerialBahanPage() {
         setLoading(true);
         setSubmitted(true);
         try {
-            const res = await laporanService.getTopMaterials({
-                from,
-                to,
-                search: search.trim() || undefined,
-                limit: Number(limit),
-            });
-            setItems(res.items);
-            setSummary(res.summary);
+            await loadReport();
         } catch {
             toast.error('Gagal memuat laporan managerial bahan');
         } finally {
             setLoading(false);
         }
     };
+
+    useAutoRefresh(async () => {
+        if (!submitted || loading) return;
+        await loadReport();
+    }, { intervalMs: 10_000, enabled: submitted });
 
     const ranked = useMemo(
         () => items.map((item, idx) => ({ ...item, rank: idx + 1 })),

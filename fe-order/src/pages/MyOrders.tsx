@@ -5,7 +5,9 @@ import { toast } from '@/hooks/use-toast';
 import { ChevronLeft, ImageIcon, Minus, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import cartIcon from '../../assets/cart.svg';
+import orderSuccessIcon from '../../assets/order_succes.png';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CartService } from '@/services/cart.service';
 import type { CartItem } from '@/types';
 import { ProdukService } from '@/services/produk.service';
@@ -18,6 +20,7 @@ const MyOrdersPage = () => {
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [updatingQtyIds, setUpdatingQtyIds] = useState<string[]>([]);
     const [materialImageById, setMaterialImageById] = useState<Record<string, string>>({});
+    const [checkoutSuccessCount, setCheckoutSuccessCount] = useState<number | null>(null);
     const selectAllRef = useRef<HTMLInputElement | null>(null);
 
     const paymentLabels: Record<'pay_later' | 'dp' | 'pay_now', string> = {
@@ -123,8 +126,7 @@ const MyOrdersPage = () => {
             const result = await CartService.checkout(checkedIds);
             const count = result.checkedOut ?? checkedIds.length;
             await loadCarts();
-            toast({ title: `${count} pesanan berhasil dibuat` });
-            navigate('/');
+            setCheckoutSuccessCount(count);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Gagal checkout keranjang';
             toast({ title: 'Gagal checkout', description: message, variant: 'destructive' });
@@ -203,6 +205,20 @@ const MyOrdersPage = () => {
         return first.materialImage || materialImageById[first.materialId];
     };
 
+    const handleCloseSuccessDialog = () => {
+        setCheckoutSuccessCount(null);
+    };
+
+    const handleOrderAgain = () => {
+        setCheckoutSuccessCount(null);
+        navigate('/');
+    };
+
+    const handleGoToHistory = () => {
+        setCheckoutSuccessCount(null);
+        navigate('/riwayat-pesanan');
+    };
+
     return (
         <div className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
@@ -246,7 +262,7 @@ const MyOrdersPage = () => {
                     <Button className="mt-5" onClick={() => navigate('/')}>Ke Halaman Order</Button>
                 </div>
             ) : (
-                <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+                <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="space-y-4">
                         <div className="rounded-xl border bg-card px-4 py-5 shadow-sm">
                             <label className="inline-flex cursor-pointer items-center gap-3 text-2xl font-semibold">
@@ -354,7 +370,7 @@ const MyOrdersPage = () => {
                         ))}
                     </div>
 
-                    <aside className="h-fit rounded-xl border bg-card p-4 shadow-sm lg:sticky lg:top-24">
+                    <aside className="h-fit rounded-xl border bg-card p-4 shadow-sm xl:sticky xl:top-24">
                         <p className="text-lg font-semibold">Ringkasan Belanja</p>
                         <div className="mt-3 space-y-2 text-sm">
                             <div className="flex items-center justify-between">
@@ -374,6 +390,22 @@ const MyOrdersPage = () => {
                     </aside>
                 </div>
             )}
+
+            <Dialog open={checkoutSuccessCount !== null} onOpenChange={(open) => !open && handleCloseSuccessDialog()}>
+                <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
+                    <DialogHeader>
+                        <img src={orderSuccessIcon} alt="Pesanan berhasil" className="mx-auto h-64 w-64 max-w-full object-contain" />
+                        <DialogTitle className="text-center text-xl">Pesanan Berhasil Dibuat</DialogTitle>
+                        <DialogDescription className="text-center">
+                            {checkoutSuccessCount ?? 0} pesanan dari keranjang berhasil dibuat dan sedang menunggu proses berikutnya.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Button variant="outline" className="w-full" onClick={handleOrderAgain}>Order Lagi</Button>
+                        <Button className="w-full" onClick={handleGoToHistory}>Lihat Status Pesanan</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

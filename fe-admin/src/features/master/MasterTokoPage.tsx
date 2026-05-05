@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { storeService } from '@/services/store.service';
 import { Store } from '@/types/store';
 import { formatDateTime } from '@/utils/formatters';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 const PAGE_SIZE_OPTIONS = ['10', '20', '50'] as const;
 
@@ -66,6 +67,8 @@ export default function MasterTokoPage() {
         load();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, limit, search]);
+
+    useAutoRefresh(load, { intervalMs: 10_000 });
 
     useEffect(() => {
         setPage(1);

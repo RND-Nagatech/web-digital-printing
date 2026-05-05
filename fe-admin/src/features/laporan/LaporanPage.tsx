@@ -14,6 +14,7 @@ import { storeService } from '@/services/store.service';
 import { formatIDR, formatDate, formatNumber } from '@/utils/formatters';
 import { getPdfEngine } from './export-engine/lazy';
 import { exportExcelWithWorker } from './export-engine/excel-worker.client';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 const PAGE_SIZE_OPTIONS = ['10', '20', '50'] as const;
 const TODAY = new Date().toISOString().slice(0, 10);
@@ -36,6 +37,13 @@ export default function LaporanPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
 
+  const loadReport = async () => {
+    const res = await laporanService.getFinanceReport({ type: viewType, from, to, search: search.trim() || undefined });
+    setItems(res.items);
+    setSummary(res.summary);
+    setActiveType(viewType);
+  };
+
   const onSearch = async () => {
     if (!from || !to) {
       setFilterError('Silahkan pilih tanggal awal dan tanggal akhir terlebih dahulu.');
@@ -50,16 +58,18 @@ export default function LaporanPage() {
     setSubmitted(true);
     setPage(1);
     try {
-      const res = await laporanService.getFinanceReport({ type: viewType, from, to, search: search.trim() || undefined });
-      setItems(res.items);
-      setSummary(res.summary);
-      setActiveType(viewType);
+      await loadReport();
     } catch {
       toast.error('Gagal memuat laporan');
     } finally {
       setLoading(false);
     }
   };
+
+  useAutoRefresh(async () => {
+    if (!submitted || loading) return;
+    await loadReport();
+  }, { intervalMs: 10_000, enabled: submitted });
 
   const totalItems = items.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / limit));

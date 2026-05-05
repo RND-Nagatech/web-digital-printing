@@ -68,6 +68,8 @@ export const OrderPage = () => {
   }, [orderItems, total]);
 
   const isFormValid = methods.formState.isValid && !!designFile && total > 0;
+  const hasOrderItems = orderItems.length > 0;
+  const canAddToCart = isFormValid && hasOrderItems && !isAddingToCart;
 
   useEffect(() => {
     if (!authUser) return;
@@ -111,6 +113,10 @@ export const OrderPage = () => {
   };
 
   const onAddToCart = async (values: OrderFormValues) => {
+    if (!hasOrderItems) {
+      toast({ title: 'Tambah item dulu ke nota', description: 'Silakan klik "Tambah Item ke Nota" sebelum menambahkan ke keranjang.', variant: 'destructive' });
+      return;
+    }
     if (!designFile) {
       toast({ title: 'Design wajib diupload', variant: 'destructive' });
       return;
@@ -124,25 +130,15 @@ export const OrderPage = () => {
       return;
     }
     const eyeletName = selectedOption && selectedOption.id !== 'none' ? selectedOption.label : undefined;
-    const payloadItems = orderItems.length > 0
-      ? orderItems.map((item) => ({
-        materialId: item.materialId,
-        panjang: item.panjang,
-        lebar: item.lebar,
-        quantity: item.quantity,
-        mataAyamLabel: item.mataAyamLabel,
-        materialName: item.materialName,
-        materialImage: item.materialImage,
-      }))
-      : [{
-        materialId: values.materialId,
-        panjang: values.panjang,
-        lebar: values.lebar,
-        quantity: values.quantity,
-        mataAyamLabel: eyeletName,
-        materialName: selectedMaterial?.name,
-        materialImage: selectedMaterial?.imageUrl,
-      }];
+    const payloadItems = orderItems.map((item) => ({
+      materialId: item.materialId,
+      panjang: item.panjang,
+      lebar: item.lebar,
+      quantity: item.quantity,
+      mataAyamLabel: item.mataAyamLabel,
+      materialName: item.materialName,
+      materialImage: item.materialImage,
+    }));
 
     try {
       setIsAddingToCart(true);
@@ -219,7 +215,7 @@ export const OrderPage = () => {
         </p>
       </div>
 
-      <form className="grid gap-6 lg:grid-cols-[1fr_380px]">
+      <form className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="space-y-5">
           <FormSection step={1} title="Pilih Bahan" description="Pilih jenis material banner yang Anda inginkan.">
             <MaterialSection />
@@ -260,20 +256,25 @@ export const OrderPage = () => {
           </FormSection>
         </div>
 
-        <aside className="lg:sticky lg:top-24 lg:h-fit">
+        <aside className="xl:sticky xl:top-24 xl:h-fit">
           <OrderSummary items={orderItems} grandTotal={finalTotal} />
           <Button
             ref={addToCartButtonRef}
             type="button"
             size="lg"
-            disabled={!isFormValid || isAddingToCart}
+            disabled={!canAddToCart}
             onClick={methods.handleSubmit(onAddToCart)}
             className="mt-4 h-12 w-full bg-gradient-primary text-base font-semibold shadow-glow transition-transform hover:scale-[1.01] disabled:opacity-50"
           >
             <ShoppingCart className="mr-2 h-5 w-5" />
             {isAddingToCart ? 'Menyimpan ke Keranjang...' : 'Tambah ke Keranjang'}
           </Button>
-          {!isFormValid && (
+          {!hasOrderItems && (
+            <p className="mt-2 text-center text-xs text-muted-foreground">
+              Silahkan klik tambah item untuk menambahkan ke keranjang.
+            </p>
+          )}
+          {hasOrderItems && !isFormValid && (
             <p className="mt-2 text-center text-xs text-muted-foreground">
               Lengkapi semua field & upload design untuk menambahkan ke keranjang
             </p>

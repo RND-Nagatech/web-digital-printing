@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { mataAyamService } from '@/services/master.service';
 import { Eyelet } from '@/types/material';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 const schema = z.object({ name: z.string().trim().min(2).max(100) });
 type FormData = z.infer<typeof schema>;
@@ -71,6 +72,8 @@ export default function MasterMataAyamPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, search]);
+
+  useAutoRefresh(load, { intervalMs: 10_000 });
 
   useEffect(() => {
     setPage(1);

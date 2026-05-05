@@ -92,11 +92,11 @@ export const MaterialSection = () => {
 
       {selected?.imageUrl && (
         <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-          <DialogContent className="max-w-2xl p-2">
+          <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl p-2">
             <img
               src={selected.imageUrl}
               alt={selected.name}
-              className="w-full rounded-lg object-contain max-h-[75vh]"
+              className="w-full rounded-lg object-contain max-h-[72vh] sm:max-h-[75vh]"
             />
             <p className="mt-2 text-center text-sm font-semibold text-foreground">{selected.name}</p>
           </DialogContent>

@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { bannerService, bahanService } from '@/services/master.service';
 import { Banner, Material } from '@/types/material';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 const PAGE_SIZE_OPTIONS = ['10', '20', '50'] as const;
 
@@ -62,6 +63,8 @@ export default function MasterBannerPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, search]);
+
+  useAutoRefresh(load, { intervalMs: 10_000 });
 
   useEffect(() => {
     setPage(1);
@@ -118,33 +121,33 @@ export default function MasterBannerPage() {
             ) : (
               <div className="overflow-hidden rounded-md border">
                 <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/40">
-                    <tr className="text-left text-base font-semibold text-foreground">
-                      <th className="px-5 py-4">Judul</th>
-                      <th className="px-5 py-4">Bahan</th>
-                      <th className="px-5 py-4 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.map((b) => (
-                      <tr key={b._id} className="border-t hover:bg-muted/30">
-                        <td className="px-5 py-5 font-semibold">{b.title ?? '-'}</td>
-                        <td className="px-5 py-5">{b.material_name ?? '-'}</td>
-                        <td className="px-5 py-5">
-                          <div className="flex justify-end gap-2">
-                            <Button size="sm" variant="outline" onClick={() => setPreview(b)}>
-                              <Eye className="mr-1 h-3.5 w-3.5" />Preview
-                            </Button>
-                            <Button size="icon" variant="ghost" onClick={async () => { await bannerService.delete(b._id); load(); }}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </td>
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/40">
+                      <tr className="text-left text-base font-semibold text-foreground">
+                        <th className="px-5 py-4">Judul</th>
+                        <th className="px-5 py-4">Bahan</th>
+                        <th className="px-5 py-4 text-right">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {data.map((b) => (
+                        <tr key={b._id} className="border-t hover:bg-muted/30">
+                          <td className="px-5 py-5 font-semibold">{b.title ?? '-'}</td>
+                          <td className="px-5 py-5">{b.material_name ?? '-'}</td>
+                          <td className="px-5 py-5">
+                            <div className="flex justify-end gap-2">
+                              <Button size="sm" variant="outline" onClick={() => setPreview(b)}>
+                                <Eye className="mr-1 h-3.5 w-3.5" />Preview
+                              </Button>
+                              <Button size="icon" variant="ghost" onClick={async () => { await bannerService.delete(b._id); load(); }}>
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
 
                 <div className="border-t bg-muted/30 px-5 py-4 text-sm font-medium">Total Banner: {total}</div>
@@ -189,13 +192,13 @@ export default function MasterBannerPage() {
             <div className="space-y-1.5"><Label>Bahan</Label>
               <Select value={form.material_id} onValueChange={(v) => setForm({ ...form, material_id: v })}>
                 <SelectTrigger className="h-10 text-sm">
-                    <SelectValue placeholder="Pilih bahan" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {materials.map((m) => (
-                      <SelectItem key={m._id} value={m._id}>{m.name}</SelectItem>
-                    ))}
-                  </SelectContent>
+                  <SelectValue placeholder="Pilih bahan" />
+                </SelectTrigger>
+                <SelectContent>
+                  {materials.map((m) => (
+                    <SelectItem key={m._id} value={m._id}>{m.name}</SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5"><Label>Gambar</Label><Input type="file" accept="image/*" onChange={(e) => setForm({ ...form, image: e.target.files?.[0] })} /></div>

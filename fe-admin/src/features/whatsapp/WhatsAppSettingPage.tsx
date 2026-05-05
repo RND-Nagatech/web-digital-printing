@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { whatsappService } from '@/services/whatsapp.service';
 import { WhatsAppSetting } from '@/types/order';
+import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 export default function WhatsAppSettingPage() {
   const [setting, setSetting] = useState<WhatsAppSetting | null>(null);
@@ -55,6 +56,10 @@ export default function WhatsAppSettingPage() {
     }, 3000);
     return () => clearInterval(timer);
   }, [setting?.connected]);
+
+  useAutoRefresh(async () => {
+    await loadStatus();
+  }, { intervalMs: 10_000 });
 
   if (!setting) return null;
 
