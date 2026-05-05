@@ -1,0 +1,17 @@
+export default () => ({
+  port: parseInt(process.env.PORT ?? '3000', 10),
+  mongodbUri: process.env.MONGODB_URI,
+  jwtSecret: process.env.JWT_SECRET,
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
+  bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS ?? '10', 10),
+  uploadMaxSize: parseInt(process.env.UPLOAD_MAX_SIZE ?? `${50 * 1024 * 1024}`, 10),
+  corsOrigin: (process.env.CORS_ORIGIN ?? 'http://localhost:5173,http://localhost:5174').split(','),
+  whatsappEnabled: process.env.WHATSAPP_ENABLED === 'true',
+  whatsappAdminNumber: process.env.WHATSAPP_ADMIN_NUMBER,
+  ownerUsername: process.env.OWNER_USERNAME ?? 'owner',
+  ownerEmail: process.env.OWNER_EMAIL ?? 'owner@printflow.local',
+  ownerPassword: process.env.OWNER_PASSWORD ?? 'owner123',
+  adminUsername: process.env.ADMIN_USERNAME ?? 'admin',
+  adminEmail: process.env.ADMIN_EMAIL ?? 'admin@printflow.local',
+  adminPassword: process.env.ADMIN_PASSWORD ?? 'admin123',
+});
