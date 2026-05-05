@@ -94,13 +94,26 @@
 }
 
 @layer base {
-  * { @apply border-border; }
-  html { font-family: 'Inter', system-ui, sans-serif; }
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-feature-settings: "cv11", "ss01";
   }
-  h1, h2, h3, h4 { font-family: 'Inter', system-ui, sans-serif; letter-spacing: -0.02em; }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.02em;
+  }
 }
 
 @layer components {
@@ -108,11 +121,36 @@
     @apply bg-card rounded-2xl border border-border/70;
     box-shadow: var(--shadow-md);
   }
+
+  .scrollbar-primary {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary)) hsl(var(--muted));
+  }
+
+  .scrollbar-primary::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .scrollbar-primary::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 9999px;
+  }
+
+  .scrollbar-primary::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary));
+    border-radius: 9999px;
+  }
+
+  .scrollbar-primary::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary-glow));
+  }
+
   .section-label {
     @apply inline-flex h-7 w-7 items-center justify-center rounded-lg text-sm font-semibold;
     background: var(--gradient-primary);
     color: hsl(var(--primary-foreground));
   }
+
   .gradient-text {
     background: var(--gradient-primary);
     -webkit-background-clip: text;

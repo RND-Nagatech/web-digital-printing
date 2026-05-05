@@ -180,10 +180,13 @@ const OrderHistoryPage = () => {
                 </div>
             </div>
 
-            <div className="grid gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
-                <section className="flex h-full min-h-0 flex-col rounded-xl border bg-card p-4">
+            <div className="grid items-start gap-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+                <section className="flex flex-col self-start rounded-xl border bg-card p-4">
                     <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="font-semibold">Daftar Pesanan</p>
+                        <div>
+                            <p className="font-semibold">Daftar Pesanan</p>
+                            <p className="text-xs text-muted-foreground">Scroll daftar untuk lihat pesanan lainnya</p>
+                        </div>
                         <Select
                             value={activeStatus}
                             onValueChange={(value) => setActiveStatus(value as OrderStatus | 'all')}
@@ -202,40 +205,42 @@ const OrderHistoryPage = () => {
                         </Select>
                     </div>
 
-                    <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                        {isLoading ? (
-                            <p className="py-10 text-center text-sm text-muted-foreground">Memuat pesanan...</p>
-                        ) : orders.length === 0 ? (
-                            <p className="py-10 text-center text-sm text-muted-foreground">Belum ada pesanan.</p>
-                        ) : (
-                            <div className="space-y-2 pb-1">
-                                {orders.map((order) => (
-                                    <button
-                                        key={order.id}
-                                        type="button"
-                                        onClick={() => setSelectedOrderId(order.id)}
-                                        className={`w-full rounded-lg border p-3 text-left transition-colors ${selectedOrderId === order.id
-                                            ? 'border-primary bg-primary/5'
-                                            : 'border-border hover:border-primary/50'
-                                            }`}
-                                    >
-                                        <div className="flex items-start justify-between gap-2">
-                                            <p className="font-semibold">{order.no_faktur}</p>
-                                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[order.status]}`}>
-                                                {STATUS_LABEL[order.status]}
-                                            </span>
-                                        </div>
-                                        <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(order.createdAt)}</p>
-                                        <div className="mt-2 flex items-center justify-between">
-                                            <p className="text-sm font-semibold">{formatIDR(order.total)}</p>
-                                            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${PAYMENT_BADGE[order.payment_status]}`}>
-                                                {PAYMENT_LABEL[order.payment_status]}
-                                            </span>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        )}
+                    <div className="relative">
+                        <div className="scrollbar-primary max-h-[520px] overflow-y-auto rounded-lg p-2">
+                            {isLoading ? (
+                                <p className="py-10 text-center text-sm text-muted-foreground">Memuat pesanan...</p>
+                            ) : orders.length === 0 ? (
+                                <p className="py-10 text-center text-sm text-muted-foreground">Belum ada pesanan.</p>
+                            ) : (
+                                <div className="space-y-2 pb-1">
+                                    {orders.map((order) => (
+                                        <button
+                                            key={order.id}
+                                            type="button"
+                                            onClick={() => setSelectedOrderId(order.id)}
+                                            className={`w-full rounded-lg border p-3 text-left transition-colors ${selectedOrderId === order.id
+                                                ? 'border-primary bg-primary/5'
+                                                : 'border-border hover:border-primary/50'
+                                                }`}
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <p className="font-semibold">{order.no_faktur}</p>
+                                                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${STATUS_BADGE[order.status]}`}>
+                                                    {STATUS_LABEL[order.status]}
+                                                </span>
+                                            </div>
+                                            <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(order.createdAt)}</p>
+                                            <div className="mt-2 flex items-center justify-between">
+                                                <p className="text-sm font-semibold">{formatIDR(order.total)}</p>
+                                                <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${PAYMENT_BADGE[order.payment_status]}`}>
+                                                    {PAYMENT_LABEL[order.payment_status]}
+                                                </span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </section>
 
@@ -272,12 +277,19 @@ const OrderHistoryPage = () => {
                                     <div className="overflow-x-auto pb-2">
                                         <div className="min-w-[360px] px-2 md:min-w-[480px]">
                                             <div className="relative pt-1">
-                                                <div className="absolute left-10 right-10 top-6 border-t border-dashed border-border" />
+                                                <div className="absolute left-10 right-10 top-6 h-[2px] overflow-hidden rounded-full bg-border">
+                                                    <div
+                                                        className="h-full bg-primary transition-all duration-300"
+                                                        style={{
+                                                            width: `${Math.max(0, (getProgressIndex(selected.status) / (TIMELINE.length - 1)) * 100)}%`,
+                                                        }}
+                                                    />
+                                                </div>
                                                 <div className="relative grid grid-cols-4 gap-2">
                                                     {TIMELINE.map((step, idx) => {
-                                                        const currentIdx = getProgressIndex(selected.status);
-                                                        const isDone = currentIdx > idx;
-                                                        const isActive = currentIdx === idx;
+                                                        const progressIdx = getProgressIndex(selected.status);
+                                                        const isDone = progressIdx > idx;
+                                                        const isActive = progressIdx === idx;
                                                         const Icon = step.icon;
 
                                                         return (
