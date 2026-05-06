@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescript
 const LoginPage = lazy(() => import("./features/auth/LoginPage"));
 const DashboardPage = lazy(() => import("./features/dashboard/DashboardPage"));
 const MasterBahanPage = lazy(() => import("./features/master/MasterBahanPage"));
+const MasterUkuranPage = lazy(() => import("./features/master/MasterUkuranPage"));
 const MasterMataAyamPage = lazy(() => import("./features/master/MasterMataAyamPage"));
 const MasterBannerPage = lazy(() => import("./features/master/MasterBannerPage"));
 const MasterTokoPage = lazy(() => import("./features/master/MasterTokoPage"));
@@ -159,6 +160,7 @@ const App = () => {
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/master/bahan" element={<ProtectedRoute permission="materials:read"><MasterBahanPage /></ProtectedRoute>} />
+                <Route path="/master/ukuran" element={<ProtectedRoute permission="sizes:read"><MasterUkuranPage /></ProtectedRoute>} />
                 <Route path="/master/mata-ayam" element={<ProtectedRoute permission="eyelets:read"><MasterMataAyamPage /></ProtectedRoute>} />
                 <Route path="/master/banner" element={<ProtectedRoute permission="banners:read"><MasterBannerPage /></ProtectedRoute>} />
                 <Route path="/master/toko" element={<ProtectedRoute permission="stores:read"><MasterTokoPage /></ProtectedRoute>} />

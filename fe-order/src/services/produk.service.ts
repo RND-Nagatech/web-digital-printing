@@ -1,5 +1,5 @@
 import { api } from './api';
-import type { Material, MataAyamOption } from '@/types';
+import type { Material, MataAyamOption, SizePreset } from '@/types';
 
 type ApiWrap<T> = { success: boolean; message: string; data: T };
 type Paged<T> = { items: T[]; meta: { total: number; page: number; limit: number; totalPages: number } };
@@ -36,5 +36,17 @@ export const ProdukService = {
       })),
     ];
     return options;
+  },
+  async getSizePresets(): Promise<SizePreset[]> {
+    const res = await api.get<ApiWrap<any[]>>('/sizes/public');
+    const items = res.data.data ?? [];
+    return items.map((row: any) => ({
+      id: row._id,
+      code: row.kode_ukuran,
+      name: row.nama_ukuran,
+      description: row.deskripsi ?? '',
+      panjangCm: Number(row.panjang_cm),
+      lebarCm: Number(row.lebar_cm),
+    }));
   },
 };

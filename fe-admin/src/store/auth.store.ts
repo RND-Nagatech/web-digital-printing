@@ -58,6 +58,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (key === 'master') {
       return [
         'materials:read',
+        'sizes:read',
         'eyelets:read',
         'banners:read',
         'stores:read',

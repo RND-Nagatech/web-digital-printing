@@ -21,6 +21,7 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { CartsModule } from './modules/carts/carts.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { SizesModule } from './modules/sizes/sizes.module';
 import { UploadService } from './common/utils/upload.service';
 
 @Module({
@@ -47,6 +48,7 @@ import { UploadService } from './common/utils/upload.service';
     CustomersModule,
     CartsModule,
     SettingsModule,
+    SizesModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }, UploadService],
 })

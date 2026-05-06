@@ -48,6 +48,8 @@ export const OrderPage = () => {
       customerEmail: '',
       address: '',
       materialId: '',
+      sizeMode: 'custom',
+      sizePresetId: '',
       panjang: undefined as unknown as number,
       lebar: undefined as unknown as number,
       quantity: undefined as unknown as number,

@@ -11,6 +11,8 @@ export const orderFormSchema = z.object({
   customerEmail: z.string().trim().email('Email tidak valid').max(120).optional().or(z.literal('')),
   address: z.string().trim().min(3, 'Alamat minimal 3 karakter').max(200, 'Alamat maks 200 karakter'),
   materialId: z.string().min(1, 'Pilih bahan terlebih dahulu'),
+  sizeMode: z.enum(['preset', 'custom']).default('custom'),
+  sizePresetId: z.string().optional(),
   panjang: z.coerce.number().positive('Panjang harus lebih dari 0').max(100, 'Maks 100 m'),
   lebar: z.coerce.number().positive('Lebar harus lebih dari 0').max(100, 'Maks 100 m'),
   quantity: z.coerce.number().int('Harus bilangan bulat').positive('Minimal 1').max(9999, 'Maks 9999'),

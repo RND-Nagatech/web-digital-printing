@@ -29,7 +29,7 @@ export class AuthService implements OnModuleInit {
         name: RoleName.ADMIN,
         permissions: [
           'users:read', 'users:create', 'users:update', 'roles:read',
-          'materials:read', 'orders:read', 'orders:update-status',
+          'materials:read', 'sizes:read', 'orders:read', 'orders:update-status',
           'stores:read', 'stores:create', 'stores:update', 'settings:read', 'settings:update',
         ],
       });
@@ -39,7 +39,7 @@ export class AuthService implements OnModuleInit {
 
     const adminRole = roles.find((r) => r.name === RoleName.ADMIN);
     if (adminRole) {
-      const requiredAdminPermissions = ['stores:read', 'stores:create', 'stores:update', 'settings:read', 'settings:update'];
+      const requiredAdminPermissions = ['stores:read', 'stores:create', 'stores:update', 'settings:read', 'settings:update', 'sizes:read'];
       const merged = Array.from(new Set([...(adminRole.permissions ?? []), ...requiredAdminPermissions]));
       const hasAll = requiredAdminPermissions.every((p) => (adminRole.permissions ?? []).includes(p));
       if (!hasAll) {
@@ -87,6 +87,7 @@ export class AuthService implements OnModuleInit {
       ? [
         'users:create', 'users:read', 'users:update', 'users:delete', 'roles:create', 'roles:read', 'roles:update', 'roles:delete',
         'materials:create', 'materials:read', 'materials:update', 'materials:delete', 'eyelets:create', 'eyelets:read', 'eyelets:update', 'eyelets:delete',
+        'sizes:create', 'sizes:read', 'sizes:update', 'sizes:delete',
         'banners:create', 'banners:read', 'banners:update', 'banners:delete', 'orders:create', 'orders:read', 'orders:update-status', 'orders:upload-payment',
         'cash:create', 'cash:read', 'cash:update', 'cash:delete', 'reports:read', 'stores:create', 'stores:read', 'stores:update', 'settings:read', 'settings:update', 'whatsapp:send', 'whatsapp:auto-reply',
       ]

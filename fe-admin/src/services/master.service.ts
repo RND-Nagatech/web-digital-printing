@@ -2,13 +2,17 @@ import { apiDeleteOk, apiGetData, apiPostData, apiPutData } from './api';
 import { Banner, Eyelet, Material } from '@/types/material';
 import {
   BannerEntityDto,
+  BannersPagedResponseDto,
   CreateBannerRequestDto,
   CreateEyeletRequestDto,
   CreateMaterialRequestDto,
   EyeletEntityDto,
+  EyeletsPagedResponseDto,
   MaterialNeedsReactivateDto,
   MaterialEntityDto,
   MaterialsPagedResponseDto,
+  SizeEntityDto,
+  SizesPagedResponseDto,
   UpdateBannerRequestDto,
   UpdateEyeletRequestDto,
   UpdateMaterialRequestDto,
@@ -70,4 +74,19 @@ export const bannerService = {
     return apiPutData<BannerEntityDto, FormData>(`/banners/${id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
   delete: (id: string) => apiDeleteOk(`/banners/${id}`),
+};
+
+export const sizeService = {
+  getPaged: (params: { page: number; limit: number; search?: string }) =>
+    apiGetData<SizesPagedResponseDto>(
+      `/sizes?page=${params.page}&limit=${params.limit}${params.search ? `&search=${encodeURIComponent(params.search)}` : ''}`,
+    ),
+  getAll: () => apiGetData<SizeEntityDto[]>('/sizes/public'),
+  create: (payload: { kode_ukuran: string; nama_ukuran: string; panjang_cm: number; lebar_cm: number; is_active: boolean }) =>
+    apiPostData<SizeEntityDto, typeof payload>('/sizes', payload),
+  update: (
+    id: string,
+    payload: Partial<{ kode_ukuran: string; nama_ukuran: string; panjang_cm: number; lebar_cm: number; is_active: boolean }>,
+  ) => apiPutData<SizeEntityDto, typeof payload>(`/sizes/${id}`, payload),
+  delete: (id: string) => apiDeleteOk(`/sizes/${id}`),
 };

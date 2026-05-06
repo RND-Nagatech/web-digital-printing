@@ -12,11 +12,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { bahanService, mataAyamService } from '@/services/master.service';
+import { bahanService, mataAyamService, sizeService } from '@/services/master.service';
 import { transaksiService } from '@/services/transaksi.service';
 import { storeService } from '@/services/store.service';
 import { settingsService } from '@/services/settings.service';
-import { Material, Eyelet } from '@/types/material';
+import { Material, Eyelet, SizePreset } from '@/types/material';
 import { formatIDR } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
 import lunasIcon from '@/assets/lunas_icon.png';
@@ -46,6 +46,8 @@ const schema = z.object({
   panjang: z.coerce.number().min(0.01),
   lebar: z.coerce.number().min(0.01),
   quantity: z.coerce.number().min(1),
+  size_mode: z.enum(['preset', 'custom']).default('custom'),
+  size_preset_id: z.string().optional(),
   mata_ayam: z.string().optional(),
   payment_method: z.enum(['pay_now', 'dp', 'pay_later']),
   payment_channel: z.enum(['transfer', 'cash']).optional(),
@@ -64,6 +66,7 @@ export default function TransaksiBaruPage() {
   const navigate = useNavigate();
   const [materials, setMaterials] = useState<Material[]>([]);
   const [eyelets, setEyelets] = useState<Eyelet[]>([]);
+  const [sizePresets, setSizePresets] = useState<SizePreset[]>([]);
   const [orderItems, setOrderItems] = useState<Array<{
     kode_bahan: string;
     nama_bahan: string;
@@ -90,6 +93,8 @@ export default function TransaksiBaruPage() {
       panjang: undefined as unknown as number,
       lebar: undefined as unknown as number,
       quantity: undefined as unknown as number,
+      size_mode: 'custom',
+      size_preset_id: '',
       mata_ayam: 'none',
       payment_method: undefined as unknown as 'pay_now' | 'dp' | 'pay_later',
       payment_channel: undefined,
@@ -97,6 +102,8 @@ export default function TransaksiBaruPage() {
   });
 
   const paymentMethod = watch('payment_method');
+  const sizeMode = watch('size_mode');
+  const sizePresetId = watch('size_preset_id');
   const paymentChannel = watch('payment_channel');
   const needsProof = (paymentMethod === 'pay_now' || paymentMethod === 'dp') && paymentChannel === 'transfer';
   const paymentOptions = useMemo(
@@ -109,12 +116,23 @@ export default function TransaksiBaruPage() {
   );
 
   useEffect(() => {
-    Promise.all([bahanService.getAll(), mataAyamService.getAll()]).then(([m, e]) => {
+    Promise.all([bahanService.getAll(), mataAyamService.getAll(), sizeService.getAll()]).then(([m, e, sizes]) => {
       setMaterials(m.filter((x) => x.is_active));
       setEyelets(e);
+      setSizePresets(sizes.filter((x) => x.is_active));
       if (m[0]) setValue('kode_bahan', m[0].code);
     });
   }, [setValue]);
+
+  useEffect(() => {
+    if (sizeMode !== 'preset') return;
+    const selected = sizePresets.find((x) => x._id === sizePresetId);
+    if (!selected) return;
+    const p = Number((selected.panjang_cm / 100).toFixed(4));
+    const l = Number((selected.lebar_cm / 100).toFixed(4));
+    setValue('panjang', p, { shouldValidate: true });
+    setValue('lebar', l, { shouldValidate: true });
+  }, [sizeMode, sizePresetId, sizePresets, setValue]);
 
   useEffect(() => {
     void settingsService.getOrderPolicyPublic()
@@ -335,10 +353,42 @@ export default function TransaksiBaruPage() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="sm:col-span-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <Button
+                  type="button"
+                  variant={sizeMode === 'preset' ? 'default' : 'outline'}
+                  className={sizeMode === 'preset' ? 'gradient-primary text-primary-foreground' : ''}
+                  onClick={() => setValue('size_mode', 'preset')}
+                >
+                  Pilih Ukuran Standar
+                </Button>
+                <Button
+                  type="button"
+                  variant={sizeMode === 'custom' ? 'default' : 'outline'}
+                  className={sizeMode === 'custom' ? 'gradient-primary text-primary-foreground' : ''}
+                  onClick={() => setValue('size_mode', 'custom')}
+                >
+                  Input Ukuran Custom
+                </Button>
+              </div>
+              {sizeMode === 'preset' && (
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Ukuran Standar</Label>
+                  <Select value={sizePresetId ?? ''} onValueChange={(v) => setValue('size_preset_id', v)}>
+                    <SelectTrigger className="h-10 text-sm"><SelectValue placeholder="Pilih ukuran (A4/A3/dll)" /></SelectTrigger>
+                    <SelectContent>
+                      {sizePresets.map((s) => (
+                        <SelectItem key={s._id} value={s._id}>{s.kode_ukuran} - {s.nama_ukuran} ({s.panjang_cm} x {s.lebar_cm} cm)</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label>Panjang (m)</Label>
                 <Input
                   inputMode="decimal"
+                  disabled={sizeMode === 'preset'}
                   placeholder="Silahkan input panjang (meter)"
                   onKeyDown={blockArrow}
                   onInput={(e) => {
@@ -353,6 +403,7 @@ export default function TransaksiBaruPage() {
                 <Label>Lebar (m)</Label>
                 <Input
                   inputMode="decimal"
+                  disabled={sizeMode === 'preset'}
                   placeholder="Silahkan input lebar (meter)"
                   onKeyDown={blockArrow}
                   onInput={(e) => {

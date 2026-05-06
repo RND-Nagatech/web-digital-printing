@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Package, Eye, Image as ImageIcon, Users, ShieldCheck,
   Receipt, Wallet, MessageSquare, Settings as SettingsIcon, FileBarChart,
-  ChevronDown, Printer, Store,
+  ChevronDown, Printer, Store, Ruler,
 } from "lucide-react";
 import { useState } from "react";
 import { useAuthStore } from "@/store/auth.store";
@@ -27,6 +27,7 @@ const MENU: MenuItem[] = [
     label: "Master", icon: Package,
     children: [
       { label: "Master Bahan", to: "/master/bahan", permission: "materials:read" },
+      { label: "Master Ukuran", to: "/master/ukuran", permission: "sizes:read" },
       { label: "Master Mata Ayam", to: "/master/mata-ayam", permission: "eyelets:read" },
       { label: "Master Banner", to: "/master/banner", permission: "banners:read" },
       { label: "Master Toko", to: "/master/toko", permission: "stores:read" },
@@ -62,6 +63,7 @@ const MENU: MenuItem[] = [
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   "Master Bahan": Package, "Master Mata Ayam": Eye, "Master Banner": ImageIcon,
+  "Master Ukuran": Ruler,
   "Master Toko": Store,
   "Master User": Users, "Hak Akses User": ShieldCheck,
   "Setting WhatsApp": SettingsIcon, "Auto Reply Rules": MessageSquare,

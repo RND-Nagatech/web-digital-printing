@@ -29,6 +29,7 @@ const ACCESS_SECTIONS: { title: string; items: AccessItem[] }[] = [
     title: 'Master',
     items: [
       { key: 'master:bahan', label: 'Master Bahan', permissions: ['materials:read'] },
+      { key: 'master:ukuran', label: 'Master Ukuran', permissions: ['sizes:read'] },
       { key: 'master:mata-ayam', label: 'Master Mata Ayam', permissions: ['eyelets:read'] },
       { key: 'master:banner', label: 'Master Banner', permissions: ['banners:read'] },
       { key: 'master:toko', label: 'Master Toko', permissions: ['stores:read'] },

@@ -25,3 +25,15 @@ export interface Banner {
   deleted_date?: string | null;
   created_at: string;
 }
+
+export interface SizePreset {
+  _id: string;
+  kode_ukuran: string;
+  nama_ukuran: string;
+  deskripsi?: string;
+  satuan?: 'CM' | 'M';
+  panjang_cm: number;
+  lebar_cm: number;
+  is_active: boolean;
+  created_at: string;
+}

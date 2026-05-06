@@ -18,6 +18,15 @@ export interface MataAyamOption {
   extraPricePerSqm: number;
 }
 
+export interface SizePreset {
+  id: ID;
+  code: string;
+  name: string;
+  description?: string;
+  panjangCm: number;
+  lebarCm: number;
+}
+
 export type PaymentMethod = 'pay_now' | 'dp' | 'pay_later';
 export type PaymentStatus = 'unpaid' | 'dp' | 'paid';
 export type OrderStatus = 'open' | 'processing' | 'printing' | 'selesai' | 'cancelled';

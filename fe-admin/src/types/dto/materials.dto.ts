@@ -1,8 +1,9 @@
-import { Banner, Eyelet, Material } from '@/types/material';
+import { Banner, Eyelet, Material, SizePreset } from '@/types/material';
 
 export type MaterialEntityDto = Material;
 export type EyeletEntityDto = Eyelet;
 export type BannerEntityDto = Banner;
+export type SizeEntityDto = SizePreset;
 
 export interface PagedMetaDto {
   page: number;
@@ -23,6 +24,11 @@ export interface EyeletsPagedResponseDto {
 
 export interface BannersPagedResponseDto {
   items: BannerEntityDto[];
+  meta: PagedMetaDto;
+}
+
+export interface SizesPagedResponseDto {
+  items: SizeEntityDto[];
   meta: PagedMetaDto;
 }
 
