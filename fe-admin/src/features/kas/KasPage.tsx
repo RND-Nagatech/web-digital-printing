@@ -57,8 +57,8 @@ export default function KasPage() {
     setValue('jumlah', num, { shouldValidate: true });
   };
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await kasService.getPaged({ page, limit, search, type: filter });
       if (Array.isArray(res)) {
@@ -71,14 +71,14 @@ export default function KasPage() {
         setTotalPages(res.meta.totalPages);
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [filter, page, limit, search]);
   useEffect(() => { kasService.getAll().then(setAllCash); }, []);
   useAutoRefresh(async () => {
-    await Promise.all([load(), kasService.getAll().then(setAllCash)]);
+    await Promise.all([load(true), kasService.getAll().then(setAllCash)]);
   }, { intervalMs: 10_000 });
   useEffect(() => { setPage(1); }, [search, limit]);
 
@@ -263,6 +263,14 @@ export default function KasPage() {
                 {tooltip.name}: {formatIDR(tooltip.value)}
               </div>
             )}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-3 text-sm">
+            <p className="rounded-md border border-success/30 bg-success/10 px-3 py-1 font-medium text-success">
+              Masuk: {formatIDR(totals.income)}
+            </p>
+            <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-1 font-medium text-destructive">
+              Keluar: {formatIDR(totals.expense)}
+            </p>
           </div>
         </CardContent>
       </Card>

@@ -24,7 +24,7 @@ export class CartsController {
     }
 
     @Post()
-    @UseInterceptors(FileFieldsInterceptor([{ name: 'design_file', maxCount: 1 }, { name: 'payment_proof', maxCount: 1 }], {
+    @UseInterceptors(FileFieldsInterceptor([{ name: 'design_files', maxCount: 20 }, { name: 'payment_proof', maxCount: 1 }], {
         limits: { fileSize: MAX_SIZE },
         storage: diskStorage({
             destination: (_req, file, cb) => cb(null, file.fieldname === 'payment_proof' ? 'uploads/payment-proofs' : 'uploads/designs'),
@@ -38,7 +38,7 @@ export class CartsController {
     create(
         @Req() req: any,
         @Body() dto: CreateCartDto,
-        @UploadedFiles() files?: { design_file?: Express.Multer.File[]; payment_proof?: Express.Multer.File[] },
+        @UploadedFiles() files?: { design_files?: Express.Multer.File[]; payment_proof?: Express.Multer.File[] },
     ) {
         if (req.user?.actor !== 'customer' || !req.user?.kode_customer) {
             return { success: false, message: 'Forbidden' };
@@ -48,10 +48,18 @@ export class CartsController {
         dto.alamat = req.user.alamat ?? dto.alamat;
         dto.no_hp = req.user.no_hp ?? dto.no_hp;
 
+        const uploadedDesigns = files?.design_files ?? [];
+        if (uploadedDesigns.length > 0) {
+            dto.items = (dto.items ?? []).map((item, idx) => ({
+                ...item,
+                design_file: uploadedDesigns[idx] ? `/uploads/designs/${uploadedDesigns[idx].filename}` : (item.design_file ?? ''),
+            }));
+        }
+
         return this.service.create(
             req.user.kode_customer,
             dto,
-            files?.design_file?.[0] ? `/uploads/designs/${files.design_file[0].filename}` : undefined,
+            dto.items?.[0]?.design_file || undefined,
             files?.payment_proof?.[0] ? `/uploads/payment-proofs/${files.payment_proof[0].filename}` : undefined,
         );
     }

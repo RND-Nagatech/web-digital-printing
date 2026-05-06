@@ -3,6 +3,14 @@ import type { Order, OrderStatus, PaymentStatus } from '@/types';
 
 type ApiWrap<T> = { success: boolean; message: string; data: T };
 type Paged<T> = { items: T[]; meta: { page: number; limit: number; total: number; totalPages: number } };
+type OrderPolicyDto = {
+    unpaid_expiry_hours: number;
+    allow_process_unpaid?: boolean;
+    allow_process_dp?: boolean;
+    updated_date?: string;
+    can_pay_later?: boolean;
+    pay_later_suspended_until?: string | null;
+};
 
 type OrderItemDto = {
     kode_bahan: string;
@@ -83,5 +91,22 @@ export const OrderService = {
             items,
             meta: data?.meta ?? { page: 1, limit: 50, total: items.length, totalPages: 1 },
         };
+    },
+
+    async uploadPaymentProof(orderId: string, file: File): Promise<Order> {
+        const fd = new FormData();
+        fd.append('payment_proof', file);
+
+        const res = await api.post<ApiWrap<OrderDto>>(
+            `/orders/${orderId}/payment-proof`,
+            fd,
+            { headers: { 'Content-Type': 'multipart/form-data' } },
+        );
+        return mapOrder(res.data.data);
+    },
+
+    async getOrderPolicy(): Promise<OrderPolicyDto> {
+        const res = await api.get<ApiWrap<OrderPolicyDto>>('/settings/order-policy/public');
+        return res.data.data;
     },
 };

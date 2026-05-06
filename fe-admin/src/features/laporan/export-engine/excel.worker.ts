@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import ExcelJS from 'exceljs';
 import type { FillPattern } from 'exceljs';
-import type { BuildExcelPayload, FinanceExcelItem, MaterialsExcelItem, WorkerExcelResponse } from './excel-worker.types';
+import type { BuildExcelPayload, FinanceExcelItem, MaterialsExcelItem, SalesExcelItem, WorkerExcelResponse } from './excel-worker.types';
 
 const EXCEL_BORDER = {
     top: { style: 'thin', color: { argb: 'FFBFBFBF' } },
@@ -297,6 +297,92 @@ const buildMaterialsWorkbook = (payload: BuildExcelPayload): ExcelJS.Workbook =>
     return workbook;
 };
 
+const buildSalesTransactionsWorkbook = (payload: BuildExcelPayload): ExcelJS.Workbook => {
+    if (payload.kind !== 'sales-transactions') {
+        throw new Error('Invalid payload kind for sales transactions workbook');
+    }
+
+    const { workbook, worksheet } = createWorkbook(payload.title);
+    const totalCols = 12;
+    worksheet.columns = [
+        { width: 8 },
+        { width: 14 },
+        { width: 20 },
+        { width: 24 },
+        { width: 34 },
+        { width: 10 },
+        { width: 16 },
+        { width: 16 },
+        { width: 14 },
+        { width: 14 },
+        { width: 14 },
+        { width: 14 },
+    ];
+
+    addStandardExcelHeader(worksheet, {
+        title: payload.title,
+        dateFrom: payload.dateFrom,
+        dateTo: payload.dateTo,
+        storeName: payload.storeName,
+        storeAddress: payload.storeAddress,
+        totalCols,
+    });
+
+    worksheet.addRow([]);
+    const headerRow = worksheet.addRow([
+        'No',
+        'Tanggal',
+        'No Faktur',
+        'Pelanggan',
+        'Pesanan',
+        'Quantity',
+        'Harga Jual / Meter',
+        'Harga Total',
+        'Tunai',
+        'Transfer',
+        'DP',
+        'Sisa',
+    ]);
+    styleHeaderRow(headerRow, 5);
+    headerRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' };
+    headerRow.getCell(2).alignment = { horizontal: 'left', vertical: 'middle' };
+    headerRow.getCell(3).alignment = { horizontal: 'left', vertical: 'middle' };
+    headerRow.getCell(4).alignment = { horizontal: 'left', vertical: 'middle' };
+    headerRow.getCell(5).alignment = { horizontal: 'left', vertical: 'middle' };
+    headerRow.height = 26;
+
+    let currentRow = headerRow.number + 1;
+    payload.items.forEach((item: SalesExcelItem, idx) => {
+        const row = worksheet.getRow(currentRow);
+        row.getCell(1).value = idx + 1;
+        row.getCell(2).value = item.tanggal;
+        row.getCell(3).value = item.noFaktur;
+        row.getCell(4).value = item.pelanggan;
+        row.getCell(5).value = item.pesanan;
+        row.getCell(6).value = item.quantity;
+        row.getCell(7).value = item.hargaJualPerMeter;
+        row.getCell(8).value = item.hargaTotal;
+        row.getCell(9).value = item.tunai;
+        row.getCell(10).value = item.transfer;
+        row.getCell(11).value = item.dp;
+        row.getCell(12).value = item.sisa;
+
+        for (let col = 6; col <= 12; col += 1) {
+            row.getCell(col).alignment = { horizontal: 'right', vertical: 'middle' };
+            row.getCell(col).numFmt = NUM_FMT_NUMBER;
+        }
+        row.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+        applyBorderRow(row);
+        row.height = 24;
+        currentRow += 1;
+    });
+
+    addPrintDateRow(worksheet, totalCols);
+    for (let i = 1; i <= 3; i += 1) worksheet.getRow(i).height = 22;
+    worksheet.views = [{ state: 'frozen', ySplit: headerRow.number }];
+    return workbook;
+};
+
 const toArrayBuffer = (bufferLike: unknown): ArrayBuffer => {
     if (bufferLike instanceof ArrayBuffer) return bufferLike.slice(0);
     if (typeof SharedArrayBuffer !== 'undefined' && bufferLike instanceof SharedArrayBuffer) {
@@ -314,7 +400,9 @@ self.onmessage = async (event: MessageEvent<BuildExcelPayload>): Promise<void> =
         const payload = event.data;
         const workbook = payload.kind === 'finance'
             ? buildFinanceWorkbook(payload)
-            : buildMaterialsWorkbook(payload);
+            : payload.kind === 'materials'
+                ? buildMaterialsWorkbook(payload)
+                : buildSalesTransactionsWorkbook(payload);
         const rawBuffer = await workbook.xlsx.writeBuffer();
         const buffer = toArrayBuffer(rawBuffer);
         const response: WorkerExcelResponse = { ok: true, fileName: payload.fileName, buffer };

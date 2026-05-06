@@ -9,6 +9,7 @@ export class CreateCartItemDto {
     @IsOptional() @IsString() mata_ayam?: string;
     @IsOptional() @IsString() nama_bahan?: string;
     @IsOptional() @IsString() gambar_bahan?: string;
+    @IsOptional() @IsString() design_file?: string;
 }
 
 export class CreateCartDto {
@@ -27,6 +28,7 @@ export class CreateCartDto {
                 mata_ayam: raw.mata_ayam ?? raw.mataAyamLabel ?? raw.eyelet,
                 nama_bahan: raw.nama_bahan ?? raw.materialName ?? raw.material_name,
                 gambar_bahan: raw.gambar_bahan ?? raw.materialImage ?? raw.material_image ?? raw.imageUrl,
+                design_file: raw.design_file ?? raw.designFile,
             };
         };
 

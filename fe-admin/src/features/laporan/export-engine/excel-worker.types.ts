@@ -27,6 +27,30 @@ export type MaterialsExcelSummary = {
     totalRevenue: number;
 };
 
+export type SalesExcelItem = {
+    tanggal: string;
+    noFaktur: string;
+    pelanggan: string;
+    pesanan: string;
+    quantity: number;
+    hargaJualPerMeter: number;
+    hargaTotal: number;
+    tunai: number;
+    transfer: number;
+    dp: number;
+    sisa: number;
+};
+
+export type SalesExcelSummary = {
+    totalRecords: number;
+    totalQuantity: number;
+    totalHargaTotal: number;
+    totalTunai: number;
+    totalTransfer: number;
+    totalDp: number;
+    totalSisa: number;
+};
+
 export type BuildExcelPayload =
     | {
         kind: 'finance';
@@ -50,6 +74,17 @@ export type BuildExcelPayload =
         storeAddress?: string;
         items: MaterialsExcelItem[];
         summary: MaterialsExcelSummary;
+    }
+    | {
+        kind: 'sales-transactions';
+        fileName: string;
+        title: string;
+        dateFrom: string;
+        dateTo: string;
+        storeName?: string;
+        storeAddress?: string;
+        items: SalesExcelItem[];
+        summary: SalesExcelSummary;
     };
 
 export type WorkerExcelSuccess = {

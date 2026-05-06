@@ -45,15 +45,15 @@ export default function AutoReplyPage() {
     defaultValues: { keyword: '', reply: '', active: true, matchType: 'contains' },
   });
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await whatsappService.getPaged({ page, limit, search: query });
       setItems(res.items || []);
       setTotal(res.meta?.total ?? 0);
       setTotalPages(res.meta?.totalPages ?? 1);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -62,7 +62,7 @@ export default function AutoReplyPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, query]);
 
-  useAutoRefresh(load, { intervalMs: 10_000 });
+  useAutoRefresh(() => load(true), { intervalMs: 10_000 });
 
   useEffect(() => {
     setPage(1);

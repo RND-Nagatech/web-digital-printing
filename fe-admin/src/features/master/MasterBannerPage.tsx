@@ -33,8 +33,8 @@ export default function MasterBannerPage() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const [bannersRes, mats] = await Promise.all([bannerService.getPaged({ page, limit, search }), bahanService.getAll()]);
 
@@ -55,7 +55,7 @@ export default function MasterBannerPage() {
 
       setMaterials(mats);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -64,7 +64,7 @@ export default function MasterBannerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, search]);
 
-  useAutoRefresh(load, { intervalMs: 10_000 });
+  useAutoRefresh(() => load(true), { intervalMs: 10_000 });
 
   useEffect(() => {
     setPage(1);

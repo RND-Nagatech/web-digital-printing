@@ -55,6 +55,14 @@ const ACCESS_SECTIONS: { title: string; items: AccessItem[] }[] = [
     items: [
       { key: 'laporan:keuangan', label: 'Laporan Keuangan', permissions: ['menu:laporan:keuangan', 'reports:read'] },
       { key: 'laporan:managerial', label: 'Laporan Managerial Bahan', permissions: ['menu:laporan:managerial', 'reports:read'] },
+      { key: 'laporan:transaksi-penjualan', label: 'Laporan Transaksi Penjualan', permissions: ['menu:laporan:transaksi-penjualan', 'reports:read'] },
+    ],
+  },
+  {
+    title: 'Pengaturan',
+    items: [
+      { key: 'pengaturan:lihat', label: 'Lihat Pengaturan', permissions: ['settings:read'] },
+      { key: 'pengaturan:ubah', label: 'Ubah Pengaturan', permissions: ['settings:update'] },
     ],
   },
 ];
@@ -131,7 +139,8 @@ export default function HakAksesPage() {
 
       const hasLaporanMenu =
         currentRolePermissions.has('menu:laporan:keuangan') ||
-        currentRolePermissions.has('menu:laporan:managerial');
+        currentRolePermissions.has('menu:laporan:managerial') ||
+        currentRolePermissions.has('menu:laporan:transaksi-penjualan');
 
       if (!hasLaporanMenu) {
         currentRolePermissions.delete('reports:read');

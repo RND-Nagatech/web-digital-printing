@@ -18,7 +18,7 @@ const MyOrdersPage = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
-    const [updatingQtyIds, setUpdatingQtyIds] = useState<string[]>([]);
+    const [updatingQtyKeys, setUpdatingQtyKeys] = useState<string[]>([]);
     const [materialImageById, setMaterialImageById] = useState<Record<string, string>>({});
     const [checkoutSuccessCount, setCheckoutSuccessCount] = useState<number | null>(null);
     const selectAllRef = useRef<HTMLInputElement | null>(null);
@@ -156,38 +156,34 @@ const MyOrdersPage = () => {
         }
     };
 
-    const getTotalQuantity = (item: CartItem) => {
-        const items = item.payload.items ?? [];
-        if (items.length === 0) return item.payload.quantity ?? 1;
-        return items.reduce((sum, x) => sum + (x.quantity ?? 0), 0);
+    const toPatchItems = (items: NonNullable<CartItem['payload']['items']>) =>
+        items.map((x) => ({
+            kode_bahan: x.materialId,
+            panjang: x.panjang,
+            lebar: x.lebar,
+            quantity: x.quantity,
+            ...(x.mataAyamLabel ? { mata_ayam: x.mataAyamLabel } : {}),
+            ...(x.materialName ? { nama_bahan: x.materialName } : {}),
+            ...((x.materialImage || materialImageById[x.materialId]) ? { gambar_bahan: x.materialImage || materialImageById[x.materialId] } : {}),
+            ...(x.designFileUrl ? { design_file: x.designFileUrl } : {}),
+        }));
+
+    const calcEstimatedTotal = (items: NonNullable<CartItem['payload']['items']>) => {
+        const oldQty = items.reduce((sum, x) => sum + (x.quantity ?? 0), 0);
+        if (oldQty <= 0) return 0;
+        return oldQty;
     };
 
-    const handleChangeQuantity = async (item: CartItem, delta: 1 | -1) => {
-        const baseItems = item.payload.items ?? [];
-        if (baseItems.length === 0) return;
-
-        const oldQty = baseItems.reduce((sum, x) => sum + (x.quantity ?? 0), 0);
-        const nextItems = baseItems.map((x) => ({
-            ...x,
-            quantity: Math.max(1, (x.quantity ?? 1) + delta),
-        }));
+    const persistCartItems = async (cart: CartItem, nextItems: NonNullable<CartItem['payload']['items']>, qtyKey: string) => {
+        const currentItems = cart.payload.items ?? [];
+        const oldQty = currentItems.reduce((sum, x) => sum + (x.quantity ?? 0), 0);
         const newQty = nextItems.reduce((sum, x) => sum + (x.quantity ?? 0), 0);
+        const nextTotal = oldQty > 0 ? Math.max(0, Math.round((cart.total / oldQty) * newQty)) : cart.total;
 
-        if (oldQty <= 0 || newQty === oldQty) return;
-
-        const nextTotal = Math.max(0, Math.round((item.total / oldQty) * newQty));
-        setUpdatingQtyIds((prev) => [...prev, item.id]);
+        setUpdatingQtyKeys((prev) => [...prev, qtyKey]);
         try {
-            await CartService.update(item.id, {
-                items: nextItems.map((x) => ({
-                    kode_bahan: x.materialId,
-                    panjang: x.panjang,
-                    lebar: x.lebar,
-                    quantity: x.quantity,
-                    ...(x.mataAyamLabel ? { mata_ayam: x.mataAyamLabel } : {}),
-                    ...(x.materialName ? { nama_bahan: x.materialName } : {}),
-                    ...((x.materialImage || materialImageById[x.materialId]) ? { gambar_bahan: x.materialImage || materialImageById[x.materialId] } : {}),
-                })),
+            await CartService.update(cart.id, {
+                items: toPatchItems(nextItems),
                 estimated_total: nextTotal,
             });
             await loadCarts();
@@ -195,8 +191,39 @@ const MyOrdersPage = () => {
             const message = error instanceof Error ? error.message : 'Gagal mengubah quantity';
             toast({ title: 'Gagal update quantity', description: message, variant: 'destructive' });
         } finally {
-            setUpdatingQtyIds((prev) => prev.filter((id) => id !== item.id));
+            setUpdatingQtyKeys((prev) => prev.filter((key) => key !== qtyKey));
         }
+    };
+
+    const handleIncreaseItemQuantity = async (cart: CartItem, itemIndex: number) => {
+        const items = cart.payload.items ?? [];
+        const target = items[itemIndex];
+        if (!target) return;
+        const nextItems = items.map((it, idx) => (
+            idx === itemIndex ? { ...it, quantity: Math.max(1, (it.quantity ?? 1) + 1) } : it
+        ));
+        await persistCartItems(cart, nextItems, `${cart.id}-${itemIndex}`);
+    };
+
+    const handleDecreaseItemQuantity = async (cart: CartItem, itemIndex: number) => {
+        const items = cart.payload.items ?? [];
+        const target = items[itemIndex];
+        if (!target) return;
+
+        if ((target.quantity ?? 1) <= 1) {
+            if (items.length === 1) {
+                await handleRemoveOne(cart.id);
+                return;
+            }
+            const nextItems = items.filter((_, idx) => idx !== itemIndex);
+            await persistCartItems(cart, nextItems, `${cart.id}-${itemIndex}`);
+            return;
+        }
+
+        const nextItems = items.map((it, idx) => (
+            idx === itemIndex ? { ...it, quantity: Math.max(1, (it.quantity ?? 1) - 1) } : it
+        ));
+        await persistCartItems(cart, nextItems, `${cart.id}-${itemIndex}`);
     };
 
     const resolveMaterialImage = (item: CartItem) => {
@@ -314,23 +341,51 @@ const MyOrdersPage = () => {
                                 </div>
 
                                 <div className="mt-3 space-y-2 rounded-lg bg-secondary/30 p-3">
-                                    {(item.payload.items ?? []).map((it, idx) => (
+                                    {(item.payload.items ?? []).map((it, idx) => {
+                                        const qtyKey = `${item.id}-${idx}`;
+                                        const isUpdatingQty = updatingQtyKeys.includes(qtyKey);
+                                        const qty = Math.max(1, it.quantity ?? 1);
+                                        return (
                                         <div key={`${item.id}-${idx}`} className="flex items-start justify-between gap-3 text-sm">
                                             <div>
                                                 <p className="font-medium">{it.materialName ?? it.materialId}</p>
                                                 <p className="text-muted-foreground">
-                                                    {it.panjang} x {it.lebar} m • Qty {it.quantity}
+                                                    {it.panjang} x {it.lebar} m
                                                     {it.mataAyamLabel ? ` • ${it.mataAyamLabel}` : ''}
                                                 </p>
                                             </div>
+                                            <div className="inline-flex items-center rounded-full border border-primary/25 px-2 py-1">
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 disabled:opacity-40"
+                                                    onClick={() => void handleDecreaseItemQuantity(item, idx)}
+                                                    disabled={isUpdatingQty}
+                                                    aria-label={qty <= 1 ? 'Hapus item' : 'Kurangi quantity'}
+                                                >
+                                                    {qty <= 1 ? <Trash2 className="h-4 w-4 text-red-600" /> : <Minus className="h-4 w-4" />}
+                                                </button>
+                                                <span className="min-w-10 text-center text-base font-semibold">{qty}</span>
+                                                <button
+                                                    type="button"
+                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 disabled:opacity-40"
+                                                    onClick={() => void handleIncreaseItemQuantity(item, idx)}
+                                                    disabled={isUpdatingQty}
+                                                    aria-label="Tambah quantity"
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                </button>
+                                            </div>
                                         </div>
-                                    ))}
+                                    )})}
                                 </div>
 
                                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
                                     <div>
                                         <p className="text-sm text-muted-foreground">Metode bayar: {paymentLabels[item.payload.paymentMethod]}</p>
                                         <p className="text-lg font-bold">{formatIDR(item.total)}</p>
+                                        {(item.payload.paymentMethod === 'pay_later' || item.payload.paymentMethod === 'dp') && (
+                                            <p className="mt-1 text-xs text-primary">Untuk pembayaran tunai, silakan datang langsung ke toko.</p>
+                                        )}
                                     </div>
 
                                     <div className="ml-auto flex items-center gap-2">
@@ -343,27 +398,6 @@ const MyOrdersPage = () => {
                                         >
                                             <Trash2 className="h-5 w-5" />
                                         </button>
-                                        <div className="inline-flex items-center rounded-full border border-primary/25 px-2 py-1">
-                                            <button
-                                                type="button"
-                                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 disabled:opacity-40"
-                                                onClick={() => void handleChangeQuantity(item, -1)}
-                                                disabled={updatingQtyIds.includes(item.id) || getTotalQuantity(item) <= 1}
-                                                aria-label="Kurangi quantity"
-                                            >
-                                                <Minus className="h-4 w-4" />
-                                            </button>
-                                            <span className="min-w-10 text-center text-base font-semibold">{getTotalQuantity(item)}</span>
-                                            <button
-                                                type="button"
-                                                className="inline-flex h-8 w-8 items-center justify-center rounded-full text-primary transition-colors hover:bg-primary/10 disabled:opacity-40"
-                                                onClick={() => void handleChangeQuantity(item, 1)}
-                                                disabled={updatingQtyIds.includes(item.id)}
-                                                aria-label="Tambah quantity"
-                                            >
-                                                <Plus className="h-4 w-4" />
-                                            </button>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -386,6 +420,7 @@ const MyOrdersPage = () => {
                         <Button className="mt-4 h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => void handleCheckout()} disabled={isSubmitting || selectedItems.length === 0}>
                             {isSubmitting ? 'Memproses Checkout...' : `Beli Terpilih (${selectedItems.length})`}
                         </Button>
+                        <p className="mt-2 text-center text-xs text-muted-foreground">Jika ingin bayar tunai, silakan datang langsung ke toko.</p>
                         {isLoading && <p className="mt-2 text-center text-xs text-muted-foreground">Menyinkronkan keranjang...</p>}
                     </aside>
                 </div>

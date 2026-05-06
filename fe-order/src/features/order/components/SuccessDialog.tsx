@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle2, Clock } from 'lucide-react';
 import { formatIDR } from '@/utils/format';
 import type { Order } from '@/types';
+import { OrderService } from '@/services/order.service';
+import { useEffect, useState } from 'react';
 
 interface Props {
   order?: Order;
@@ -15,6 +17,21 @@ export const SuccessDialog = ({ order, onClose, onNew, onPrint }: Props) => {
   const open = Boolean(order);
   const isPaid = order?.payment_status === 'paid';
   const isDp = order?.payment_status === 'dp';
+  const [unpaidExpiryHours, setUnpaidExpiryHours] = useState(24);
+
+  useEffect(() => {
+    if (!open) return;
+    void OrderService.getOrderPolicy()
+      .then((policy) => {
+        if (policy?.unpaid_expiry_hours && policy.unpaid_expiry_hours > 0) {
+          setUnpaidExpiryHours(policy.unpaid_expiry_hours);
+        }
+      })
+      .catch(() => {
+        setUnpaidExpiryHours(24);
+      });
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-md">
@@ -32,7 +49,7 @@ export const SuccessDialog = ({ order, onClose, onNew, onPrint }: Props) => {
               ? 'Pembayaran kami terima. Order akan segera diproses.'
               : isDp
                 ? `DP diterima. Lunasi sisa pembayaran ${order?.sisa ? formatIDR(order.sisa) : ''} sebelum barang diambil.`
-                : 'Silakan lakukan pembayaran maksimal 1×24 jam agar order diproses.'}
+                : `Silakan lakukan pembayaran maksimal ${unpaidExpiryHours} jam agar order diproses.`}
           </DialogDescription>
         </DialogHeader>
         {order && (

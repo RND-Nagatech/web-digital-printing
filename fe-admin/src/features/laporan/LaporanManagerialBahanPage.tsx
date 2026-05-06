@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import type { RowInput } from 'jspdf-autotable';
 import { toast } from 'sonner';
@@ -16,25 +16,39 @@ import { getPdfEngine } from './export-engine/lazy';
 import { exportExcelWithWorker } from './export-engine/excel-worker.client';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
-const TODAY = new Date().toISOString().slice(0, 10);
+const getTodayWib = () => {
+  const now = new Date();
+  const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  return wib.toISOString().slice(0, 10);
+};
+const TODAY = getTodayWib();
 
 export default function LaporanManagerialBahanPage() {
     const [from, setFrom] = useState(TODAY);
     const [to, setTo] = useState(TODAY);
     const [search, setSearch] = useState('');
     const [limit, setLimit] = useState('20');
+    const [appliedFrom, setAppliedFrom] = useState(TODAY);
+    const [appliedTo, setAppliedTo] = useState(TODAY);
+    const [appliedSearch, setAppliedSearch] = useState('');
+    const [appliedLimit, setAppliedLimit] = useState('20');
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [items, setItems] = useState<TopMaterialItem[]>([]);
     const [summary, setSummary] = useState({ total_materials: 0, total_qty: 0, total_revenue: 0 });
     const [filterError, setFilterError] = useState('');
 
-    const loadReport = async () => {
+    const loadReport = async (
+        dateFrom = appliedFrom,
+        dateTo = appliedTo,
+        q = appliedSearch,
+        topLimit = appliedLimit,
+    ) => {
         const res = await laporanService.getTopMaterials({
-            from,
-            to,
-            search: search.trim() || undefined,
-            limit: Number(limit),
+            from: dateFrom,
+            to: dateTo,
+            search: q.trim() || undefined,
+            limit: Number(topLimit),
         });
         setItems(res.items);
         setSummary(res.summary);
@@ -52,8 +66,12 @@ export default function LaporanManagerialBahanPage() {
         setFilterError('');
         setLoading(true);
         setSubmitted(true);
+        setAppliedFrom(from);
+        setAppliedTo(to);
+        setAppliedSearch(search);
+        setAppliedLimit(limit);
         try {
-            await loadReport();
+            await loadReport(from, to, search, limit);
         } catch {
             toast.error('Gagal memuat laporan managerial bahan');
         } finally {
@@ -65,6 +83,15 @@ export default function LaporanManagerialBahanPage() {
         if (!submitted || loading) return;
         await loadReport();
     }, { intervalMs: 10_000, enabled: submitted });
+
+    useEffect(() => {
+        if (!submitted) return;
+        const timer = setTimeout(() => {
+            setAppliedSearch(search);
+            void loadReport(appliedFrom, appliedTo, search, appliedLimit);
+        }, 350);
+        return () => clearTimeout(timer);
+    }, [search, submitted, appliedFrom, appliedTo, appliedLimit]);
 
     const ranked = useMemo(
         () => items.map((item, idx) => ({ ...item, rank: idx + 1 })),
@@ -212,6 +239,12 @@ export default function LaporanManagerialBahanPage() {
                         placeholder="Cari kode atau nama bahan..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                void onSearch();
+                            }
+                        }}
                         className="h-10 bg-white pl-8"
                     />
                 </div>

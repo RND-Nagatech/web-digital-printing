@@ -34,4 +34,14 @@ export class ReportsController {
   ) {
     return this.service.getTopMaterials({ from, to, search, limit: limit ? parseInt(limit, 10) : undefined });
   }
+
+  @Get('sales/transactions')
+  @Permissions('reports:read')
+  salesTransactions(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.service.getSalesTransactionsReport({ from, to, search });
+  }
 }

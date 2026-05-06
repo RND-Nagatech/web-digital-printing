@@ -47,6 +47,17 @@ const LoginPage = () => {
         }
     }, []);
 
+    useEffect(() => {
+        const prevBodyOverflow = document.body.style.overflow;
+        const prevHtmlOverflow = document.documentElement.style.overflow;
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+        return () => {
+            document.body.style.overflow = prevBodyOverflow;
+            document.documentElement.style.overflow = prevHtmlOverflow;
+        };
+    }, []);
+
     const onRegisterChange = (key: keyof typeof registerForm, value: string) => {
         setRegisterForm((prev) => ({ ...prev, [key]: value }));
     };
@@ -104,19 +115,20 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="relative min-h-screen overflow-hidden bg-slate-100">
+        <div className="relative h-dvh overflow-hidden bg-slate-100">
             <img src={loginImage} alt="Digital Printing" className="absolute inset-0 h-full w-full object-cover object-[45%_center]" />
             <div className="absolute inset-0 bg-white/10" />
 
-            <div className="relative z-10 flex min-h-screen items-center justify-center p-4 sm:p-8 lg:justify-end lg:p-14">
-                <div className="w-full max-w-md rounded-2xl border border-white/70 bg-white/95 p-5 shadow-2xl sm:p-8">
+            <div className="relative z-10 flex h-dvh items-center justify-center p-4 sm:p-8 lg:justify-end lg:p-14">
+                <div className="flex h-full w-full max-w-md flex-col rounded-2xl border border-white/70 bg-white/95 p-5 shadow-2xl sm:max-h-[calc(100dvh-4rem)] sm:p-8">
                     <h1 className="text-3xl font-semibold tracking-tight text-slate-800 sm:text-4xl">{isRegisterMode ? 'Buat Akun' : 'Selamat Datang'}</h1>
                     <p className="mt-2 text-base text-slate-500">
                         {isRegisterMode ? 'Isi data untuk membuat akun baru' : 'Silakan masuk untuk melanjutkan'}
                     </p>
 
+                    <div className="mt-8 flex-1 overflow-y-auto pr-1">
                     {isRegisterMode ? (
-                        <form className="mt-8 space-y-4" onSubmit={onRegisterSubmit}>
+                        <form className="space-y-4" onSubmit={onRegisterSubmit}>
                             <div className="space-y-2">
                                 <Label className="text-slate-600">Nama</Label>
                                 <Input value={registerForm.nama} onChange={(e) => onRegisterChange('nama', e.target.value)} className="h-11 bg-white" placeholder="Masukkan nama" />
@@ -162,7 +174,7 @@ const LoginPage = () => {
                             </Button>
                         </form>
                     ) : (
-                        <form className="mt-8 space-y-5" onSubmit={onLoginSubmit}>
+                        <form className="space-y-5" onSubmit={onLoginSubmit}>
                             <div className="space-y-2">
                                 <Label className="text-slate-600">Username atau Email</Label>
                                 <Input
@@ -207,6 +219,7 @@ const LoginPage = () => {
                             </Button>
                         </form>
                     )}
+                    </div>
 
                     <p className="mt-6 text-center text-sm text-muted-foreground">
                         {isRegisterMode ? 'Sudah punya akun? ' : 'Belum punya akun? '}

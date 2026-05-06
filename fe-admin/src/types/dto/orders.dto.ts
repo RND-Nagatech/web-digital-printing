@@ -17,6 +17,7 @@ export interface CreateOrderRequestDto {
     lebar: number;
     quantity: number;
     mata_ayam?: string;
+    design_file?: string;
   }>;
   payment_method?: 'pay_now' | 'dp' | 'pay_later';
   payment_channel?: 'transfer' | 'cash';

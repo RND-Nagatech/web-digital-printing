@@ -44,6 +44,7 @@ export interface OrderPayload {
     mataAyamLabel?: string;
     materialName?: string;
     materialImage?: string;
+    designFileUrl?: string;
   }>;
   notes?: string;
   paymentMethod: PaymentMethod;

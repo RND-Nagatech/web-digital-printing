@@ -58,7 +58,41 @@ export class BannersService {
     return this.mapBanner({ ...created.toObject(), material_name: mat.nama_bahan, material_description: mat.deskripsi });
   }
 
-  async findAll() {
+  async findAll(page = 1, limit = 10, search?: string) {
+    const query: Record<string, any> = {};
+    if (search?.trim()) {
+      const re = new RegExp(search.trim(), 'i');
+      query.$or = [{ title: re }, { kode_bahan: re }];
+    }
+
+    const skip = (page - 1) * limit;
+    const [rows, total, bahan] = await Promise.all([
+      this.model.find(query).sort({ created_at: -1 }).skip(skip).limit(limit).lean(),
+      this.model.countDocuments(query),
+      this.materialModel.find({ status_delete: false }).lean(),
+    ]);
+
+    const byCode = new Map((bahan as any[]).map((m) => [m.kode_bahan, { name: m.nama_bahan ?? '-', desc: m.deskripsi ?? '' }]));
+    const mapped = rows.map((r: any) =>
+      this.mapBanner({
+        ...r,
+        material_name: byCode.get(r.kode_bahan)?.name ?? '-',
+        material_description: byCode.get(r.kode_bahan)?.desc ?? '',
+      }),
+    );
+
+    return {
+      items: mapped,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    };
+  }
+
+  async findAllRaw() {
     const rows = await this.model.find().sort({ created_at: -1 }).lean();
     const bahan = await this.materialModel.find({ status_delete: false }).lean();
     const byCode = new Map((bahan as any[]).map((m) => [m.kode_bahan, { name: m.nama_bahan ?? '-', desc: m.deskripsi ?? '' }]));

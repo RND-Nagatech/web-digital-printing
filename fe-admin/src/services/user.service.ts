@@ -17,11 +17,22 @@ export const userService = {
       .then((res) => {
         // backend may return paged { items, meta } or plain array
         if (Array.isArray(res)) return res.map(mapUser);
-        if (res && typeof res === 'object') return { items: (res.items || []).map(mapUser), meta: res.meta };
+        if (res && typeof res === 'object') {
+          const items = (res.items || []).map(mapUser);
+          const meta = res.meta ?? {
+            page: params.page,
+            limit: params.limit,
+            total: items.length,
+            totalPages: 1,
+          };
+          return { items, meta };
+        }
         return [] as User[];
       }),
   async getAll(params?: { search?: string }) {
-    let data = (await apiGetData<UserEntityDto[]>('/users')).map(mapUser);
+    const raw = await apiGetData<any>(`/users?page=1&limit=1000${params?.search ? `&search=${encodeURIComponent(params.search)}` : ''}`);
+    const list: UserEntityDto[] = Array.isArray(raw) ? raw : (raw?.items ?? []);
+    let data = list.map(mapUser);
     if (params?.search) {
       const q = params.search.toLowerCase();
       data = data.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));

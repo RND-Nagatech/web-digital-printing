@@ -52,6 +52,37 @@ export interface TopMaterialsResponse {
     };
 }
 
+export interface SalesTransactionItem {
+    tanggal: string;
+    no_faktur: string;
+    pelanggan: string;
+    pesanan: string;
+    quantity: number;
+    harga_jual_per_meter: number;
+    harga_total: number;
+    tunai: number;
+    transfer: number;
+    dp: number;
+    sisa: number;
+}
+
+export interface SalesTransactionsResponse {
+    items: SalesTransactionItem[];
+    summary: {
+        total_records: number;
+        total_quantity: number;
+        total_harga_total: number;
+        total_tunai: number;
+        total_transfer: number;
+        total_dp: number;
+        total_sisa: number;
+    };
+    meta: {
+        from: string;
+        to: string;
+    };
+}
+
 export const laporanService = {
     getFinanceReport(params: {
         type: 'rekap' | 'detail';
@@ -68,5 +99,12 @@ export const laporanService = {
         limit?: number;
     }) {
         return apiGetData<TopMaterialsResponse>('/reports/materials/top', { params });
+    },
+    getSalesTransactions(params: {
+        from: string;
+        to: string;
+        search?: string;
+    }) {
+        return apiGetData<SalesTransactionsResponse>('/reports/sales/transactions', { params });
     },
 };

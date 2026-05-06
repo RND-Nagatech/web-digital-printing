@@ -18,6 +18,12 @@ export const SizeSection = () => {
   useEffect(() => { setQuantity(quantity); }, [quantity, setQuantity]);
 
   const area = panjang * lebar;
+  const sanitizeDecimal = (value: string) => {
+    const cleaned = value.replace(/[^0-9.]/g, '');
+    const [head, ...tail] = cleaned.split('.');
+    return tail.length > 0 ? `${head}.${tail.join('')}` : head;
+  };
+  const sanitizeInteger = (value: string) => value.replace(/[^0-9]/g, '');
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -26,9 +32,13 @@ export const SizeSection = () => {
         <Input
           id="panjang"
           inputMode="decimal"
-          placeholder="contoh: 3"
+          placeholder="Silahkan input panjang (meter)"
           className="mt-1.5 h-11"
           onKeyDown={(e) => { if (['ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault(); }}
+          onInput={(e) => {
+            const target = e.currentTarget;
+            target.value = sanitizeDecimal(target.value);
+          }}
           {...register('panjang')}
         />
         {errors.panjang && <p className="mt-1 text-sm text-destructive">{errors.panjang.message}</p>}
@@ -38,9 +48,13 @@ export const SizeSection = () => {
         <Input
           id="lebar"
           inputMode="decimal"
-          placeholder="contoh: 1"
+          placeholder="Silahkan input lebar (meter)"
           className="mt-1.5 h-11"
           onKeyDown={(e) => { if (['ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault(); }}
+          onInput={(e) => {
+            const target = e.currentTarget;
+            target.value = sanitizeDecimal(target.value);
+          }}
           {...register('lebar')}
         />
         {errors.lebar && <p className="mt-1 text-sm text-destructive">{errors.lebar.message}</p>}
@@ -50,9 +64,13 @@ export const SizeSection = () => {
         <Input
           id="quantity"
           inputMode="numeric"
-          placeholder="contoh: 1"
+          placeholder="Silahkan input quantity"
           className="mt-1.5 h-11"
           onKeyDown={(e) => { if (['ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault(); }}
+          onInput={(e) => {
+            const target = e.currentTarget;
+            target.value = sanitizeInteger(target.value);
+          }}
           {...register('quantity')}
         />
         {errors.quantity && <p className="mt-1 text-sm text-destructive">{errors.quantity.message}</p>}

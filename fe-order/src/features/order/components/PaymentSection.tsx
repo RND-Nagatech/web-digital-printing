@@ -7,12 +7,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useOrderStore } from '@/store/orderStore';
 import { UploadCloud, FileIcon, X, Wallet, Clock, CreditCard } from 'lucide-react';
+import { OrderService } from '@/services/order.service';
 import type { OrderFormValues } from '../orderSchema';
 
 export const PaymentSection = () => {
   const { register, setValue, watch, formState: { errors } } = useFormContext<OrderFormValues>();
   const method = watch('paymentMethod');
   const [dpDisplay, setDpDisplay] = useState('');
+  const [unpaidExpiryHours, setUnpaidExpiryHours] = useState(24);
+  const [canPayLater, setCanPayLater] = useState(true);
+  const [suspendedUntil, setSuspendedUntil] = useState<string | null>(null);
   const proofFile = useOrderStore((s) => s.proofFile);
   const setProofFile = useOrderStore((s) => s.setProofFile);
   const [proofPreview, setProofPreview] = useState<string | undefined>();
@@ -46,6 +50,28 @@ export const PaymentSection = () => {
     if (method !== 'dp') { setDpDisplay(''); setValue('dpAmount', undefined); }
   }, [method, setProofFile, setValue]);
 
+  useEffect(() => {
+    void OrderService.getOrderPolicy()
+      .then((policy) => {
+        if (policy?.unpaid_expiry_hours && policy.unpaid_expiry_hours > 0) {
+          setUnpaidExpiryHours(policy.unpaid_expiry_hours);
+        }
+        setCanPayLater(policy?.can_pay_later !== false);
+        setSuspendedUntil(policy?.pay_later_suspended_until ?? null);
+      })
+      .catch(() => {
+        setUnpaidExpiryHours(24);
+        setCanPayLater(true);
+        setSuspendedUntil(null);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!canPayLater && method === 'pay_later') {
+      setValue('paymentMethod', 'pay_now', { shouldValidate: true });
+    }
+  }, [canPayLater, method, setValue]);
+
   const handleDpChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/\D/g, '');
     if (!raw) { setDpDisplay(''); setValue('dpAmount', undefined, { shouldValidate: true }); return; }
@@ -57,8 +83,9 @@ export const PaymentSection = () => {
   const options: Array<{ value: 'pay_now' | 'dp' | 'pay_later'; title: string; desc: string; Icon: typeof Wallet }> = [
     { value: 'pay_now', title: 'Bayar Penuh', desc: 'Upload bukti transfer & order langsung diproses.', Icon: Wallet },
     { value: 'dp', title: 'Bayar DP', desc: 'Bayar uang muka, sisa dibayar sebelum diambil.', Icon: CreditCard },
-    { value: 'pay_later', title: 'Bayar Nanti', desc: 'Order disimpan, bayar maksimal 1×24 jam.', Icon: Clock },
+    { value: 'pay_later', title: 'Bayar Nanti', desc: `Order disimpan, bayar maksimal ${unpaidExpiryHours} jam.`, Icon: Clock },
   ];
+  const visibleOptions = canPayLater ? options : options.filter((opt) => opt.value !== 'pay_later');
 
   const needsProof = method === 'pay_now' || method === 'dp';
 
@@ -89,7 +116,7 @@ export const PaymentSection = () => {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
-        {options.map(({ value, title, desc, Icon }) => {
+        {visibleOptions.map(({ value, title, desc, Icon }) => {
           const active = method === value;
           return (
             <button
@@ -115,6 +142,13 @@ export const PaymentSection = () => {
           );
         })}
       </div>
+
+      {!canPayLater && (
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Metode Bayar Nanti sementara tidak tersedia
+          {suspendedUntil ? ` sampai ${new Date(suspendedUntil).toLocaleString('id-ID')}` : ''}.
+        </div>
+      )}
 
       {method === 'dp' && (
         <div className="space-y-1.5 animate-fade-in">

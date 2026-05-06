@@ -6,11 +6,16 @@ import {
     CheckCircle2,
     CircleDollarSign,
     Clock3,
+    FileIcon,
     PackageCheck,
     Printer,
+    UploadCloud,
     XCircle,
+    X,
 } from 'lucide-react';
+import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
     Select,
     SelectContent,
@@ -91,6 +96,12 @@ const OrderHistoryPage = () => {
     const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [activeStatus, setActiveStatus] = useState<OrderStatus | 'all'>('all');
+    const [isProofDialogOpen, setIsProofDialogOpen] = useState(false);
+    const [proofFile, setProofFile] = useState<File | null>(null);
+    const [proofPreview, setProofPreview] = useState<string | null>(null);
+    const [isSubmittingProof, setIsSubmittingProof] = useState(false);
+    const [unpaidExpiryHours, setUnpaidExpiryHours] = useState(24);
+    const [nowTick, setNowTick] = useState(Date.now());
 
     const loadOrders = async (options?: { silent?: boolean; showErrorToast?: boolean }) => {
         const silent = options?.silent ?? false;
@@ -124,12 +135,29 @@ const OrderHistoryPage = () => {
     }, [activeStatus]);
 
     useEffect(() => {
+        void OrderService.getOrderPolicy()
+            .then((policy) => {
+                if (policy?.unpaid_expiry_hours && policy.unpaid_expiry_hours > 0) {
+                    setUnpaidExpiryHours(policy.unpaid_expiry_hours);
+                }
+            })
+            .catch(() => {
+                setUnpaidExpiryHours(24);
+            });
+    }, []);
+
+    useEffect(() => {
         const id = window.setInterval(() => {
             void loadOrders({ silent: true, showErrorToast: false });
         }, 10000);
 
         return () => window.clearInterval(id);
     }, [activeStatus]);
+
+    useEffect(() => {
+        const id = window.setInterval(() => setNowTick(Date.now()), 1000);
+        return () => window.clearInterval(id);
+    }, []);
 
     const selected = useMemo(
         () => orders.find((x) => x.id === selectedOrderId) ?? null,
@@ -145,8 +173,72 @@ const OrderHistoryPage = () => {
         return { total, processing, done, cancelled, unpaid };
     }, [orders]);
 
+    const paymentDeadline = useMemo(() => {
+        if (!selected || selected.payment_status !== 'unpaid') return null;
+        const createdAt = new Date(selected.createdAt).getTime();
+        if (Number.isNaN(createdAt)) return null;
+        return createdAt + unpaidExpiryHours * 60 * 60 * 1000;
+    }, [selected, unpaidExpiryHours]);
+
+    const countdownLabel = useMemo(() => {
+        if (!paymentDeadline) return null;
+        const diff = paymentDeadline - nowTick;
+        if (diff <= 0) return 'Waktu pembayaran habis';
+        const totalSeconds = Math.floor(diff / 1000);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }, [paymentDeadline, nowTick]);
+
+    useEffect(() => {
+        if (!proofFile || !proofFile.type.startsWith('image/')) {
+            setProofPreview(null);
+            return;
+        }
+        const url = URL.createObjectURL(proofFile);
+        setProofPreview(url);
+        return () => URL.revokeObjectURL(url);
+    }, [proofFile]);
+
+    const { getRootProps, getInputProps, isDragActive } = useDropzone({
+        onDrop: (accepted) => {
+            if (accepted[0]) setProofFile(accepted[0]);
+        },
+        multiple: false,
+        maxSize: 50 * 1024 * 1024,
+        accept: { 'image/*': ['.jpg', '.jpeg', '.png'] },
+    });
+
+    const submitPaymentProof = async () => {
+        if (!selected?.id) return;
+        if (selected.status === 'cancelled') {
+            toast({ title: 'Pesanan dibatalkan, pembayaran tidak dapat diproses', variant: 'destructive' });
+            return;
+        }
+        if (!proofFile) {
+            toast({ title: 'Pilih bukti transfer terlebih dahulu', variant: 'destructive' });
+            return;
+        }
+
+        try {
+            setIsSubmittingProof(true);
+            await OrderService.uploadPaymentProof(selected.id, proofFile);
+            toast({ title: 'Bukti pembayaran berhasil dikirim' });
+            setIsProofDialogOpen(false);
+            setProofFile(null);
+            await loadOrders({ silent: true, showErrorToast: true });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Gagal upload bukti pembayaran';
+            toast({ title: 'Upload gagal', description: message, variant: 'destructive' });
+        } finally {
+            setIsSubmittingProof(false);
+        }
+    };
+
     return (
-        <div className="space-y-5">
+        <>
+            <div className="space-y-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <h1 className="text-2xl font-bold">Pesanan Saya</h1>
@@ -254,13 +346,18 @@ const OrderHistoryPage = () => {
                                     <h2 className="text-xl font-bold">{selected.no_faktur}</h2>
                                     <p className="text-sm text-muted-foreground">{formatDateTime(selected.createdAt)}</p>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center justify-end gap-2">
                                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_BADGE[selected.status]}`}>
                                         {STATUS_LABEL[selected.status]}
                                     </span>
                                     <span className={`rounded-full px-3 py-1 text-xs font-semibold ${PAYMENT_BADGE[selected.payment_status]}`}>
                                         {PAYMENT_LABEL[selected.payment_status]}
                                     </span>
+                                    {selected.payment_status === 'unpaid' && countdownLabel && (
+                                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${countdownLabel === 'Waktu pembayaran habis' ? 'bg-red-100 text-red-700' : 'bg-red-50 text-red-600'}`}>
+                                            Bayar Sebelum: {countdownLabel}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
@@ -288,7 +385,7 @@ const OrderHistoryPage = () => {
                                                 <div className="relative grid grid-cols-4 gap-2">
                                                     {TIMELINE.map((step, idx) => {
                                                         const progressIdx = getProgressIndex(selected.status);
-                                                        const isDone = progressIdx > idx;
+                                                        const isDone = progressIdx >= idx;
                                                         const isActive = progressIdx === idx;
                                                         const Icon = step.icon;
 
@@ -341,6 +438,27 @@ const OrderHistoryPage = () => {
                                             <span className="font-medium">{formatIDR(selected.sisa ?? 0)}</span>
                                         </div>
                                     </div>
+                                    {(selected.payment_status === 'unpaid' || selected.payment_status === 'dp') && (
+                                        <div className="mt-3 space-y-2">
+                                            <Button
+                                                type="button"
+                                                className="h-10 w-full"
+                                                disabled={selected.status === 'cancelled'}
+                                                onClick={() => {
+                                                    if (selected.status === 'cancelled') return;
+                                                    setProofFile(null);
+                                                    setIsProofDialogOpen(true);
+                                                }}
+                                            >
+                                                Bayar Sekarang
+                                            </Button>
+                                            {selected.status !== 'cancelled' && (
+                                                <p className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-primary">
+                                                    Jika ingin bayar tunai, silakan datang langsung ke toko.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="rounded-lg border p-4">
@@ -383,6 +501,15 @@ const OrderHistoryPage = () => {
                                 </div>
                             </div>
 
+                            {selected.payment_status === 'unpaid' && (
+                                <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                                    <p className="font-semibold">Peringatan Pembayaran</p>
+                                    <p className="mt-1">
+                                        Jika belum dibayar dalam batas waktu, pesanan akan dibatalkan otomatis.
+                                    </p>
+                                </div>
+                            )}
+
                             <div className="rounded-lg border border-cyan-100 bg-cyan-50 p-3 text-sm text-cyan-800">
                                 <div className="flex items-center gap-2 font-semibold">
                                     <CircleDollarSign className="h-4 w-4" /> Update realtime setiap 10 detik
@@ -393,7 +520,69 @@ const OrderHistoryPage = () => {
                     )}
                 </section>
             </div>
-        </div>
+            </div>
+            <Dialog
+                open={isProofDialogOpen}
+                onOpenChange={(open) => {
+                    setIsProofDialogOpen(open);
+                    if (!open) setProofFile(null);
+                }}
+            >
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Upload Bukti Pembayaran</DialogTitle>
+                        <DialogDescription>
+                            Upload bukti transfer untuk menyelesaikan pembayaran pesanan ini.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-3">
+                        {!proofFile ? (
+                            <div
+                                {...getRootProps()}
+                                className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 text-center transition-colors ${isDragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                                    }`}
+                            >
+                                <input {...getInputProps()} />
+                                <UploadCloud className="mb-1.5 h-8 w-8 text-primary" />
+                                <p className="text-sm">Drag & drop bukti transfer</p>
+                                <p className="mt-1 text-xs text-muted-foreground">JPG, PNG - maks 50MB</p>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-3 rounded-xl border border-border bg-secondary/40 p-3">
+                                {proofPreview ? (
+                                    <img src={proofPreview} alt="preview bukti bayar" className="h-16 w-16 rounded-lg object-cover" />
+                                ) : (
+                                    <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-primary/10">
+                                        <FileIcon className="h-7 w-7 text-primary" />
+                                    </div>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-medium">{proofFile.name}</p>
+                                    <p className="text-xs text-muted-foreground">{(proofFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setProofFile(null)}
+                                    className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                >
+                                    <X className="h-4 w-4" />
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsProofDialogOpen(false)} disabled={isSubmittingProof}>
+                            Batal
+                        </Button>
+                        <Button type="button" onClick={submitPaymentProof} disabled={isSubmittingProof || !proofFile || selected?.status === 'cancelled'}>
+                            {isSubmittingProof ? 'Mengirim...' : 'Kirim Bukti'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 };
 

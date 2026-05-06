@@ -6,6 +6,7 @@ export class CreateOrderItemDto {
   @Type(() => Number) @IsNumber() @Min(0.1) panjang!: number;
   @Type(() => Number) @IsNumber() @Min(0.1) lebar!: number;
   @IsOptional() @IsString() mata_ayam?: string;
+  @IsOptional() @IsString() design_file?: string;
   @Type(() => Number) @IsNumber() @Min(1) quantity!: number;
 }
 
@@ -30,6 +31,7 @@ export class CreateOrderDto {
         panjang: raw.panjang ?? raw.length,
         lebar: raw.lebar ?? raw.width,
         mata_ayam: raw.mata_ayam ?? raw.mataAyamLabel ?? raw.eyelet,
+        design_file: raw.design_file ?? raw.designFile,
         quantity: raw.quantity ?? raw.qty,
       };
     };

@@ -12,6 +12,7 @@ export class OrderItem {
   @Prop({ required: true }) lebar!: number;
   @Prop({ required: true }) area!: number;
   @Prop({ default: '' }) mata_ayam!: string;
+  @Prop({ default: '' }) design_file!: string;
   @Prop({ required: true, min: 1 }) quantity!: number;
   @Prop({ required: true }) harga_satuan!: number;
   @Prop({ required: true }) subtotal!: number;

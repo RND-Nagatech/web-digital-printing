@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CashDaily } from './schemas/cash-daily.schema';
@@ -17,12 +17,21 @@ export type DailyCashRow = {
 
 @Injectable()
 export class CashDailyService {
+    private readonly logger = new Logger(CashDailyService.name);
     constructor(
         @InjectModel(CashDaily.name) private readonly cashDailyModel: Model<CashDaily>,
         @InjectModel(CashDailyHistory.name) private readonly historyModel: Model<CashDailyHistory>,
         @InjectModel(Cash.name) private readonly cashModel: Model<Cash>,
         @InjectModel(Order.name) private readonly orderModel: Model<Order>,
     ) { }
+
+    async onModuleInit() {
+        try {
+            await this.ensureToday();
+        } catch (error) {
+            this.logger.warn(`Failed to ensure cash daily on startup: ${(error as Error)?.message ?? 'unknown error'}`);
+        }
+    }
 
     toWibDateString(date: Date): string {
         const wib = new Date(date.getTime() + 7 * 60 * 60 * 1000);
@@ -125,6 +134,7 @@ export class CashDailyService {
      * Recompute penuh satu hari dari source collections, lalu sync saldo_akhir.
      */
     async recomputeDay(tanggal: Date | string): Promise<void> {
+        await this.ensureToday();
         const tanggalStr = typeof tanggal === 'string' ? tanggal : this.toWibDateString(tanggal);
         const { startUtc, endUtc } = this.dayRange(tanggalStr);
 
@@ -171,6 +181,7 @@ export class CashDailyService {
      * Gabungkan dari th_cash_daily (history) + tt_cash_daily (hari ini jika dalam range).
      */
     async getByRange(from?: string, to?: string): Promise<DailyCashRow[]> {
+        await this.ensureToday();
         const today = this.todayWib();
         const rangeFilter: Record<string, string> = {};
         if (from) rangeFilter.$gte = from;
@@ -200,6 +211,7 @@ export class CashDailyService {
      * Saldo akhir dari hari terakhir sebelum tanggal yang diminta (dari th_cash_daily).
      */
     async getSaldoBeforeDate(date: string): Promise<number> {
+        await this.ensureToday();
         const row = await this.historyModel.findOne({ tanggal: { $lt: date } }).sort({ tanggal: -1 }).lean();
         if (row) return row.saldo_akhir;
 
@@ -208,4 +220,3 @@ export class CashDailyService {
         return currentRow?.saldo_akhir ?? 0;
     }
 }
-

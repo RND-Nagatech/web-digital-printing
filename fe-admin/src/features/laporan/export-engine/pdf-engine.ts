@@ -32,6 +32,8 @@ export const drawStandardReportHeader = (
         info, title, dateFrom, dateTo, leftInset = 40, rightInset = 40,
     } = options;
     const pageWidth = doc.internal.pageSize.getWidth();
+    const rightTitle = title;
+    const rightDate = `TANGGAL : ${dateFrom} s/d ${dateTo}`;
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
@@ -44,9 +46,17 @@ export const drawStandardReportHeader = (
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
-    doc.text(title, pageWidth - rightInset, 50, { align: 'right' });
+    const titleWidth = doc.getTextWidth(rightTitle);
     doc.setFontSize(13);
-    doc.text(`TANGGAL : ${dateFrom} s/d ${dateTo}`, pageWidth - rightInset, 72, { align: 'right' });
+    const dateWidth = doc.getTextWidth(rightDate);
+    const rightBlockWidth = Math.max(titleWidth, dateWidth);
+    const rightBlockStartX = pageWidth - rightInset - rightBlockWidth;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text(rightTitle, rightBlockStartX, 50, { align: 'left' });
+    doc.setFontSize(13);
+    doc.text(rightDate, rightBlockStartX, 72, { align: 'left' });
 };
 
 export const renderReportTablePdf = (

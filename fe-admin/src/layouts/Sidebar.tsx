@@ -34,7 +34,13 @@ const MENU: MenuItem[] = [
       { label: "Hak Akses User", to: "/master/hak-akses", permission: "roles:read" },
     ],
   },
-  { label: "Transaksi", to: "/transaksi", icon: Receipt, permission: "orders:read" },
+  {
+    label: "Transaksi", icon: Receipt,
+    children: [
+      { label: "Daftar Transaksi", to: "/transaksi/daftar", permission: "orders:read" },
+      { label: "Penjualan", to: "/transaksi/penjualan", permission: "orders:read" },
+    ],
+  },
   { label: "Kas", to: "/kas", icon: Wallet, permission: "cash:read" },
   {
     label: "WhatsApp", icon: MessageSquare,
@@ -48,8 +54,10 @@ const MENU: MenuItem[] = [
     children: [
       { label: "Laporan Keuangan", to: "/laporan/keuangan", permission: "menu:laporan:keuangan" },
       { label: "Laporan Managerial Bahan", to: "/laporan/managerial-bahan", permission: "menu:laporan:managerial" },
+      { label: "Laporan Transaksi Penjualan", to: "/laporan/transaksi-penjualan", permission: "menu:laporan:transaksi-penjualan" },
     ],
   },
+  { label: "Pengaturan", to: "/pengaturan", icon: SettingsIcon, permission: "settings:read" },
 ];
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -59,6 +67,9 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   "Setting WhatsApp": SettingsIcon, "Auto Reply Rules": MessageSquare,
   "Laporan Keuangan": FileBarChart,
   "Laporan Managerial Bahan": FileBarChart,
+  "Laporan Transaksi Penjualan": FileBarChart,
+  "Daftar Transaksi": Receipt,
+  "Penjualan": Receipt,
 };
 
 export const Sidebar = () => {
@@ -119,6 +130,8 @@ export const Sidebar = () => {
                 >
                   {item.label === "Laporan" ? (
                     <img src={laporanIcon} alt="Laporan" className="h-4 w-4 shrink-0 object-contain" />
+                  ) : item.label === "Transaksi" ? (
+                    <img src={transaksiIcon} alt="Transaksi" className="h-4 w-4 shrink-0 object-contain" />
                   ) : (
                     <ItemIcon className={cn("h-4.5 w-4.5 shrink-0", mainIconTone)} />
                   )}
@@ -173,8 +186,6 @@ export const Sidebar = () => {
             >
               {item.label === "Dashboard" ? (
                 <img src={dashboardIcon} alt="Dashboard" className="h-4 w-4 shrink-0 object-contain" />
-              ) : item.label === "Transaksi" ? (
-                <img src={transaksiIcon} alt="Transaksi" className="h-4 w-4 shrink-0 object-contain" />
               ) : (
                 <ItemIcon className={cn("h-4.5 w-4.5 shrink-0", mainIconTone)} />
               )}

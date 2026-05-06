@@ -12,6 +12,7 @@ export class CartOrderItem {
     @Prop({ default: '' }) mata_ayam!: string;
     @Prop({ default: '' }) nama_bahan!: string;
     @Prop({ default: '' }) gambar_bahan!: string;
+    @Prop({ default: '' }) design_file!: string;
 }
 
 export const CartOrderItemSchema = SchemaFactory.createForClass(CartOrderItem);

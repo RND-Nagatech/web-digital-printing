@@ -18,6 +18,7 @@ type CartEntityDto = {
         mata_ayam?: string;
         nama_bahan?: string;
         gambar_bahan?: string;
+        design_file?: string;
     }>;
     payment_method: 'pay_now' | 'dp' | 'pay_later';
     dp_amount?: number;
@@ -49,6 +50,7 @@ const mapCart = (raw: CartEntityDto): CartItem => {
             mataAyamLabel: item.mata_ayam,
             materialName: item.nama_bahan,
             materialImage: item.gambar_bahan,
+            designFileUrl: item.design_file,
         })),
         notes: raw.notes,
         paymentMethod: raw.payment_method,
@@ -76,7 +78,7 @@ export const CartService = {
     async addItem(payload: {
         order: OrderPayload;
         total: number;
-        designFile?: File;
+        designFiles?: File[];
         proofFile?: File;
     }) {
         const fd = new FormData();
@@ -97,6 +99,7 @@ export const CartService = {
                 ...(item.mataAyamLabel ? { mata_ayam: item.mataAyamLabel } : {}),
                 ...(item.materialName ? { nama_bahan: item.materialName } : {}),
                 ...(item.materialImage ? { gambar_bahan: item.materialImage } : {}),
+                ...(item.designFileUrl ? { design_file: item.designFileUrl } : {}),
             }))
             : [{
                 kode_bahan: payload.order.materialId,
@@ -106,7 +109,7 @@ export const CartService = {
             }];
 
         fd.append('items', JSON.stringify(items));
-        if (payload.designFile) fd.append('design_file', payload.designFile);
+        (payload.designFiles ?? []).forEach((file) => fd.append('design_files', file));
         if (payload.proofFile) fd.append('payment_proof', payload.proofFile);
 
         const res = await api.post<ApiWrap<CartEntityDto>>('/carts', fd, {

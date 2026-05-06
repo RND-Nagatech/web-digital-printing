@@ -24,8 +24,11 @@ export class OrdersController {
     @Query('search') search?: string,
     @Query('status') status?: string,
     @Query('date') date?: string,
+    @Query('date_start') dateStart?: string,
+    @Query('date_end') dateEnd?: string,
+    @Query('payment_status') paymentStatus?: string,
   ) {
-    return this.service.findAll(page, limit, search, status, date);
+    return this.service.findAll(page, limit, search, status, date, dateStart, dateEnd, paymentStatus);
   }
 
   @Get('my')
@@ -48,9 +51,14 @@ export class OrdersController {
   @Permissions('orders:read')
   findById(@Param('id') id: string) { return this.service.findById(id); }
 
+  @Get(':id/follow-up-message')
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions('orders:read')
+  followUpMessage(@Param('id') id: string) { return this.service.getFollowUpMessage(id); }
+
   @Post()
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileFieldsInterceptor([{ name: 'design_file', maxCount: 1 }, { name: 'payment_proof', maxCount: 1 }], {
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'design_file', maxCount: 1 }, { name: 'design_files', maxCount: 20 }, { name: 'payment_proof', maxCount: 1 }], {
     limits: { fileSize: MAX_SIZE },
     storage: diskStorage({ destination: (_req, file, cb) => cb(null, file.fieldname === 'payment_proof' ? 'uploads/payment-proofs' : 'uploads/designs'), filename: fileNamer }),
     fileFilter: (_req: any, file: any, cb: any) =>
@@ -61,13 +69,21 @@ export class OrdersController {
   create(
     @Req() req: any,
     @Body() dto: CreateOrderDto,
-    @UploadedFiles() files?: { design_file?: Express.Multer.File[]; payment_proof?: Express.Multer.File[] },
+    @UploadedFiles() files?: { design_file?: Express.Multer.File[]; design_files?: Express.Multer.File[]; payment_proof?: Express.Multer.File[] },
   ) {
     if (req.user?.actor === 'customer') {
       dto.kode_customer = req.user.kode_customer;
       dto.nama_customer = req.user.nama ?? dto.nama_customer;
       dto.alamat = req.user.alamat ?? dto.alamat;
       dto.no_hp = req.user.no_hp ?? dto.no_hp;
+    }
+
+    const uploadedDesigns = files?.design_files ?? [];
+    if (uploadedDesigns.length > 0) {
+      dto.items = (dto.items ?? []).map((item, idx) => ({
+        ...item,
+        design_file: uploadedDesigns[idx] ? `/uploads/designs/${uploadedDesigns[idx].filename}` : (item.design_file ?? ''),
+      }));
     }
 
     return this.service.create(

@@ -30,7 +30,7 @@ export class AuthService implements OnModuleInit {
         permissions: [
           'users:read', 'users:create', 'users:update', 'roles:read',
           'materials:read', 'orders:read', 'orders:update-status',
-          'stores:read', 'stores:create', 'stores:update',
+          'stores:read', 'stores:create', 'stores:update', 'settings:read', 'settings:update',
         ],
       });
       await this.rolesService.create({ name: RoleName.KASIR, permissions: ['orders:read', 'cash:read', 'cash:create'] });
@@ -39,7 +39,7 @@ export class AuthService implements OnModuleInit {
 
     const adminRole = roles.find((r) => r.name === RoleName.ADMIN);
     if (adminRole) {
-      const requiredAdminPermissions = ['stores:read', 'stores:create', 'stores:update'];
+      const requiredAdminPermissions = ['stores:read', 'stores:create', 'stores:update', 'settings:read', 'settings:update'];
       const merged = Array.from(new Set([...(adminRole.permissions ?? []), ...requiredAdminPermissions]));
       const hasAll = requiredAdminPermissions.every((p) => (adminRole.permissions ?? []).includes(p));
       if (!hasAll) {
@@ -54,8 +54,8 @@ export class AuthService implements OnModuleInit {
     const adminEmail = this.configService.get<string>('adminEmail') ?? 'admin@printflow.local';
     const adminPassword = this.configService.get<string>('adminPassword') ?? 'admin123';
 
-    const users = await this.usersService.findAll();
-    if (!users.length) {
+    const users = await this.usersService.findAll(1, 1);
+    if ((users.meta?.total ?? 0) === 0) {
       await this.usersService.create({ username: ownerUsername, email: ownerEmail, password: ownerPassword, role: RoleName.OWNER });
       await this.usersService.create({ username: adminUsername, email: adminEmail, password: adminPassword, role: RoleName.ADMIN });
       return;
@@ -88,13 +88,16 @@ export class AuthService implements OnModuleInit {
         'users:create', 'users:read', 'users:update', 'users:delete', 'roles:create', 'roles:read', 'roles:update', 'roles:delete',
         'materials:create', 'materials:read', 'materials:update', 'materials:delete', 'eyelets:create', 'eyelets:read', 'eyelets:update', 'eyelets:delete',
         'banners:create', 'banners:read', 'banners:update', 'banners:delete', 'orders:create', 'orders:read', 'orders:update-status', 'orders:upload-payment',
-        'cash:create', 'cash:read', 'cash:update', 'cash:delete', 'reports:read', 'stores:create', 'stores:read', 'stores:update', 'whatsapp:send', 'whatsapp:auto-reply',
+        'cash:create', 'cash:read', 'cash:update', 'cash:delete', 'reports:read', 'stores:create', 'stores:read', 'stores:update', 'settings:read', 'settings:update', 'whatsapp:send', 'whatsapp:auto-reply',
       ]
       : (role?.permissions ?? []);
 
     const payload = { sub: String(user._id), username: user.username, role: user.role, permissions };
+    const adminTokenExpiresIn = this.configService.get<number>('jwtExpiresInAdmin')
+      ?? this.configService.get<number>('jwtExpiresIn')
+      ?? 86400;
     return {
-      access_token: await this.jwtService.signAsync(payload),
+      access_token: await this.jwtService.signAsync(payload, { expiresIn: adminTokenExpiresIn }),
       user: { id: String(user._id), username: user.username, email: user.email, role: user.role, permissions },
     };
   }
@@ -112,8 +115,11 @@ export class AuthService implements OnModuleInit {
       username: customer.username,
     };
 
+    const customerTokenExpiresIn = this.configService.get<number>('jwtExpiresInCustomer')
+      ?? this.configService.get<number>('jwtExpiresIn')
+      ?? 86400;
     return {
-      access_token: await this.jwtService.signAsync(payload),
+      access_token: await this.jwtService.signAsync(payload, { expiresIn: customerTokenExpiresIn }),
       user: {
         id: customer.id,
         kode_customer: customer.kode_customer,
@@ -144,8 +150,11 @@ export class AuthService implements OnModuleInit {
       username: customer.username,
     };
 
+    const customerTokenExpiresIn = this.configService.get<number>('jwtExpiresInCustomer')
+      ?? this.configService.get<number>('jwtExpiresIn')
+      ?? 86400;
     return {
-      access_token: await this.jwtService.signAsync(payload),
+      access_token: await this.jwtService.signAsync(payload, { expiresIn: customerTokenExpiresIn }),
       user: {
         id: String(customer._id),
         kode_customer: customer.kode_customer,

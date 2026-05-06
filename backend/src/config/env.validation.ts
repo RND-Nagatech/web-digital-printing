@@ -10,8 +10,16 @@ export class EnvValidation {
   @IsString()
   JWT_SECRET!: string;
 
-  @IsString()
+  @IsNumberString()
   JWT_EXPIRES_IN!: string;
+
+  @IsOptional()
+  @IsNumberString()
+  JWT_EXPIRES_IN_ADMIN?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  JWT_EXPIRES_IN_CUSTOMER?: string;
 
   @IsNumberString()
   BCRYPT_ROUNDS!: string;

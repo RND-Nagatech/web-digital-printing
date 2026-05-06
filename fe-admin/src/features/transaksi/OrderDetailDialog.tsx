@@ -8,6 +8,7 @@ import { StatusBadge, PaymentBadge } from '@/components/common/StatusBadge';
 import { ORDER_STATUSES } from '@/utils/constants';
 import { formatIDR, formatDateTime } from '@/utils/formatters';
 import { transaksiService } from '@/services/transaksi.service';
+import { settingsService } from '@/services/settings.service';
 import { Image as ImageIcon, MessageCircle, Download, Upload, X, Wallet } from 'lucide-react';
 
 interface Props { order: Order | null; onClose: () => void; onUpdated: () => void; }
@@ -20,6 +21,10 @@ export const OrderDetailDialog = ({ order, onClose, onUpdated }: Props) => {
   const [proofPreview, setProofPreview] = useState<string | null>(null);
   const [proofSaving, setProofSaving] = useState(false);
   const [showProof, setShowProof] = useState(false);
+  const [unpaidExpiryHours, setUnpaidExpiryHours] = useState(24);
+  const [allowProcessUnpaid, setAllowProcessUnpaid] = useState(false);
+  const [allowProcessDp, setAllowProcessDp] = useState(true);
+  const [nowTick, setNowTick] = useState(Date.now());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -29,7 +34,43 @@ export const OrderDetailDialog = ({ order, onClose, onUpdated }: Props) => {
     setProofPreview(null);
   }, [order]);
 
+  useEffect(() => {
+    void settingsService.getOrderPolicyPublic()
+      .then((policy) => {
+        if (policy?.unpaid_expiry_hours && policy.unpaid_expiry_hours > 0) {
+          setUnpaidExpiryHours(policy.unpaid_expiry_hours);
+        }
+        setAllowProcessUnpaid(policy?.allow_process_unpaid ?? false);
+        setAllowProcessDp(policy?.allow_process_dp ?? true);
+      })
+      .catch(() => {
+        setUnpaidExpiryHours(24);
+        setAllowProcessUnpaid(false);
+        setAllowProcessDp(true);
+      });
+  }, []);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
   if (!order) return null;
+
+  const paymentDeadlineTs =
+    order.payment_status === 'unpaid'
+      ? (new Date(order.created_at).getTime() + unpaidExpiryHours * 60 * 60 * 1000)
+      : null;
+  const countdownLabel = (() => {
+    if (!paymentDeadlineTs) return null;
+    const diff = paymentDeadlineTs - nowTick;
+    if (diff <= 0) return 'Waktu pembayaran habis';
+    const totalSeconds = Math.floor(diff / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  })();
 
   const settledMethodLabel = order.payment_settlement_method === 'cash'
     ? 'Tunai'
@@ -40,7 +81,18 @@ export const OrderDetailDialog = ({ order, onClose, onUpdated }: Props) => {
         : null;
 
   const isProdChanged = prodStatus !== order.status;
-  const canUploadProof = order.payment_status !== 'paid';
+  const isCancelledOrder = order.status === 'cancelled';
+  const normalizedPaymentStatus = (() => {
+    const raw = String(order.payment_status || '').toLowerCase();
+    if (raw === 'paid' || raw === 'lunas') return 'paid';
+    if (raw === 'dp' || raw === 'partial_paid') return 'dp';
+    return 'unpaid';
+  })();
+  const canUploadProof = normalizedPaymentStatus !== 'paid' && !isCancelledOrder;
+  const isNextProdStatus = prodStatus ? ['processing', 'printing', 'selesai'].includes(prodStatus) : false;
+  const blockedByPaymentRule =
+    isNextProdStatus &&
+    ((normalizedPaymentStatus === 'unpaid' && !allowProcessUnpaid) || (normalizedPaymentStatus === 'dp' && !allowProcessDp));
 
   const lineItems = (order.items?.length
     ? order.items
@@ -127,11 +179,19 @@ export const OrderDetailDialog = ({ order, onClose, onUpdated }: Props) => {
     }
   };
 
-  const sendWA = () => {
-    const phone = order.no_hp.replace(/^0/, '62').replace(/\D/g, '');
-    const prodLabel = ORDER_STATUSES.find((s) => s.value === order.status)?.label ?? order.status;
-    const msg = encodeURIComponent(`Halo ${order.nama_customer}, pesanan ${order.no_faktur} (${prodLabel}) sudah siap. Total: ${formatIDR(order.harga_total)}.`);
-    window.open(`https://wa.me/${phone}?text=${msg}`, '_blank', 'noopener');
+  const sendWA = async () => {
+    try {
+      const phone = order.no_hp.replace(/^0/, '62').replace(/\D/g, '');
+      const result = await transaksiService.getFollowUpMessage(order._id);
+      const msg = encodeURIComponent(result.message);
+      window.open(`https://wa.me/${phone}?text=${msg}`, '_blank', 'noopener');
+    } catch {
+      const phone = order.no_hp.replace(/^0/, '62').replace(/\D/g, '');
+      const prodLabel = ORDER_STATUSES.find((s) => s.value === order.status)?.label ?? order.status;
+      const msg = encodeURIComponent(`Halo ${order.nama_customer}, pesanan ${order.no_faktur} (${prodLabel}) sudah siap. Total: ${formatIDR(order.harga_total)}.`);
+      window.open(`https://wa.me/${phone}?text=${msg}`, '_blank', 'noopener');
+      toast.error('Gagal memuat template follow up dinamis, menggunakan pesan default.');
+    }
   };
 
   const fileActions = [
@@ -166,7 +226,7 @@ export const OrderDetailDialog = ({ order, onClose, onUpdated }: Props) => {
       key: 'follow-up-wa',
       label: 'Follow up WA',
       className: 'bg-green-500 hover:bg-green-600 text-white border-0',
-      onClick: sendWA,
+      onClick: () => { void sendWA(); },
       icon: <MessageCircle className="mr-2 h-4 w-4" />,
     },
   ].filter((action): action is {
@@ -185,7 +245,12 @@ export const OrderDetailDialog = ({ order, onClose, onUpdated }: Props) => {
             <DialogTitle>{order.no_faktur}</DialogTitle>
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <StatusBadge status={order.status} />
-              <PaymentBadge status={order.payment_status} />
+              <PaymentBadge status={normalizedPaymentStatus} />
+              {normalizedPaymentStatus === 'unpaid' && countdownLabel && (
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${countdownLabel === 'Waktu pembayaran habis' ? 'bg-red-100 text-red-700' : 'bg-red-50 text-red-600'}`}>
+                  Bayar Sebelum: {countdownLabel}
+                </span>
+              )}
             </div>
           </DialogHeader>
 
@@ -264,25 +329,43 @@ export const OrderDetailDialog = ({ order, onClose, onUpdated }: Props) => {
               <div className="space-y-3 rounded-lg border p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status Pengerjaan</p>
                 <Select value={prodStatus} onValueChange={(v) => setProdStatus(v as OrderStatus)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger disabled={isCancelledOrder}><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {ORDER_STATUSES.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
+                    {ORDER_STATUSES.map((s) => {
+                      const isBlockedTarget = ['processing', 'printing', 'selesai'].includes(s.value)
+                        && ((normalizedPaymentStatus === 'unpaid' && !allowProcessUnpaid) || (normalizedPaymentStatus === 'dp' && !allowProcessDp));
+                      return (
+                        <SelectItem key={s.value} value={s.value} disabled={isCancelledOrder || isBlockedTarget}>
+                          {s.label}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 <Button
                   className="w-full gradient-primary text-primary-foreground"
                   onClick={saveProdStatus}
-                  disabled={!isProdChanged || prodSaving}
+                  disabled={isCancelledOrder || !isProdChanged || prodSaving || blockedByPaymentRule}
                 >
                   {prodSaving ? 'Menyimpan...' : 'Update Pengerjaan'}
                 </Button>
+                {isCancelledOrder && (
+                  <p className="text-xs text-red-600">
+                    Pesanan dibatalkan. Tidak bisa lanjut proses pengerjaan.
+                  </p>
+                )}
+                {blockedByPaymentRule && (
+                  <p className="text-xs text-red-600">
+                    Tidak bisa lanjut proses: pembayaran belum memenuhi aturan pengaturan saat ini.
+                  </p>
+                )}
               </div>
 
               {/* Status Pembayaran */}
               <div className="space-y-3 rounded-lg border p-4">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status Pembayaran</p>
-                  <PaymentBadge status={order.payment_status} />
+                  <PaymentBadge status={normalizedPaymentStatus} />
                 </div>
 
                 {settledMethodLabel && (
@@ -297,7 +380,7 @@ export const OrderDetailDialog = ({ order, onClose, onUpdated }: Props) => {
                     <div className="space-y-1.5">
                       <p className="text-xs text-muted-foreground">Metode pelunasan</p>
                       <Select value={paymentMethod} onValueChange={(v) => setPaymentMethod(v as 'transfer' | 'cash')}>
-                        <SelectTrigger>
+                        <SelectTrigger disabled={isCancelledOrder}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -309,10 +392,10 @@ export const OrderDetailDialog = ({ order, onClose, onUpdated }: Props) => {
 
                     <p className="text-xs text-muted-foreground">
                       {paymentMethod === 'cash'
-                        ? (order.payment_status === 'dp'
+                        ? (normalizedPaymentStatus === 'dp'
                           ? `Konfirmasi pelunasan tunai (sisa ${formatIDR(order.sisa ?? 0)})`
                           : 'Konfirmasi pembayaran tunai tanpa bukti transfer')
-                        : (order.payment_status === 'dp'
+                        : (normalizedPaymentStatus === 'dp'
                           ? `Upload bukti pelunasan (sisa ${formatIDR(order.sisa ?? 0)})`
                           : 'Upload bukti transfer untuk konfirmasi pembayaran')}
                     </p>
@@ -320,7 +403,7 @@ export const OrderDetailDialog = ({ order, onClose, onUpdated }: Props) => {
                     <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png" className="hidden" onChange={handleProofChange} />
 
                     {paymentMethod === 'cash' ? (
-                      <Button className="w-full" onClick={confirmCashPayment} disabled={proofSaving}>
+                      <Button className="w-full" onClick={confirmCashPayment} disabled={isCancelledOrder || proofSaving}>
                         <Wallet className="mr-2 h-4 w-4" />
                         {proofSaving ? 'Menyimpan...' : 'Konfirmasi Tunai'}
                       </Button>
@@ -332,19 +415,21 @@ export const OrderDetailDialog = ({ order, onClose, onUpdated }: Props) => {
                             <X className="h-3 w-3" />
                           </button>
                         </div>
-                        <Button className="w-full" onClick={confirmPayment} disabled={proofSaving}>
+                        <Button className="w-full" onClick={confirmPayment} disabled={isCancelledOrder || proofSaving}>
                           <Wallet className="mr-2 h-4 w-4" />
                           {proofSaving ? 'Menyimpan...' : 'Konfirmasi Pembayaran'}
                         </Button>
                       </div>
                     ) : (
-                      <Button variant="outline" className="w-full" onClick={() => fileInputRef.current?.click()}>
+                      <Button variant="outline" className="w-full" disabled={isCancelledOrder} onClick={() => fileInputRef.current?.click()}>
                         <Upload className="mr-2 h-4 w-4" /> Pilih Bukti (JPG/PNG)
                       </Button>
                     )}
                   </>
                 ) : (
-                  <p className="text-xs text-success font-medium">Pembayaran telah lunas ✓</p>
+                  <p className={`text-xs font-medium ${isCancelledOrder ? 'text-red-600' : 'text-success'}`}>
+                    {isCancelledOrder ? 'Pesanan dibatalkan. Tidak bisa lakukan pembayaran, silahkan order kembali.' : 'Pembayaran telah lunas ✓'}
+                  </p>
                 )}
               </div>
             </div>

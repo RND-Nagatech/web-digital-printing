@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { Request } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -17,7 +17,18 @@ export class BannersController {
   constructor(private readonly service: BannersService) {}
 
   @Get()
-  findAll() { return this.service.findAll(); }
+  findAll(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    if (!page && !limit && !search) {
+      return this.service.findAllRaw();
+    }
+    const p = Math.max(1, Number(page) || 1);
+    const l = Math.min(100, Math.max(1, Number(limit) || 10));
+    return this.service.findAll(p, l, search);
+  }
 
   @Post()
   @UseGuards(JwtAuthGuard, PermissionsGuard)

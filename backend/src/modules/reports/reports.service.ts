@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, PipelineStage } from 'mongoose';
 import { Cash } from '../cash/schemas/cash.schema';
@@ -14,6 +14,20 @@ type FinanceDetailItem = {
   uang_keluar: number;
 };
 
+type SalesTransactionItem = {
+  tanggal: string;
+  no_faktur: string;
+  pelanggan: string;
+  pesanan: string;
+  quantity: number;
+  harga_jual_per_meter: number;
+  harga_total: number;
+  tunai: number;
+  transfer: number;
+  dp: number;
+  sisa: number;
+};
+
 @Injectable()
 export class ReportsService {
   constructor(
@@ -25,6 +39,30 @@ export class ReportsService {
   private toWibDateString(date: Date): string {
     const wib = new Date(date.getTime() + 7 * 60 * 60 * 1000);
     return wib.toISOString().slice(0, 10);
+  }
+
+  private escapeRegex(value: string) {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  private parseDateRange(from?: string, to?: string): {
+    from: string;
+    to: string;
+    fromUtc: Date;
+    toUtc: Date;
+  } {
+    if (!from || !to) {
+      throw new BadRequestException('Tanggal awal dan tanggal akhir wajib diisi');
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      throw new BadRequestException('Format tanggal tidak valid. Gunakan YYYY-MM-DD');
+    }
+    if (from > to) {
+      throw new BadRequestException('Tanggal awal tidak boleh lebih besar dari tanggal akhir');
+    }
+    const fromUtc = new Date(`${from}T00:00:00+07:00`);
+    const toUtc = new Date(`${to}T23:59:59.999+07:00`);
+    return { from, to, fromUtc, toUtc };
   }
 
   async summary() {
@@ -288,11 +326,12 @@ export class ReportsService {
     const pipeline: PipelineStage[] = [...basePipeline];
 
     if (search) {
+      const searchRe = new RegExp(this.escapeRegex(search), 'i');
       pipeline.push({
         $match: {
           $or: [
-            { kode_bahan: { $regex: search, $options: 'i' } },
-            { nama_bahan: { $regex: search, $options: 'i' } },
+            { kode_bahan: searchRe },
+            { nama_bahan: searchRe },
           ],
         },
       });
@@ -316,6 +355,98 @@ export class ReportsService {
         limit: safeLimit,
         from: params?.from ?? null,
         to: params?.to ?? null,
+      },
+    };
+  }
+
+  async getSalesTransactionsReport(params?: { from?: string; to?: string; search?: string }) {
+    const { from, to, fromUtc, toUtc } = this.parseDateRange(params?.from, params?.to);
+    const search = params?.search?.trim();
+    const searchFilter = search
+      ? {
+        $or: (() => {
+          const escaped = this.escapeRegex(search);
+          const searchRe = new RegExp(escaped, 'i');
+          const isOrderCode = /^ORD-\d{8}-\d{4}$/i.test(search);
+          if (isOrderCode) {
+            return [{ no_faktur: new RegExp(`^${escaped}$`, 'i') }];
+          }
+          return [
+            { no_faktur: searchRe },
+            { nama_customer: searchRe },
+            { no_hp: searchRe },
+          ];
+        })(),
+      }
+      : {};
+
+    const orders = await this.orderModel
+      .find({
+        created_at: { $gte: fromUtc, $lte: toUtc },
+        status: { $ne: 'cancelled' },
+        ...searchFilter,
+      })
+      .sort({ created_at: 1, no_faktur: 1 })
+      .lean();
+
+    const items: SalesTransactionItem[] = [];
+    for (const order of orders) {
+      const lines = order.items?.length
+        ? order.items
+        : [{
+          kode_bahan: order.kode_bahan,
+          nama_bahan: order.kode_bahan,
+          panjang: order.panjang,
+          lebar: order.lebar,
+          quantity: order.quantity,
+          area: order.area,
+          subtotal: order.harga_total,
+          harga_satuan: order.quantity > 0 ? Math.round(order.harga_total / order.quantity) : order.harga_total,
+        }];
+
+      for (const line of lines) {
+        const ratioBase = order.harga_total > 0 ? (line.subtotal / order.harga_total) : 0;
+        const ratio = Number.isFinite(ratioBase) ? Math.max(0, Math.min(1, ratioBase)) : 0;
+        const tunaiRaw = order.payment_settlement_method === 'cash' ? (order.dibayar ?? 0) : 0;
+        const transferRaw = order.payment_settlement_method === 'transfer' ? (order.dibayar ?? 0) : 0;
+        const dpRaw = order.dp_amount ?? 0;
+        const sisaRaw = order.sisa ?? 0;
+
+        const areaTotal = (line.area ?? 0) * (line.quantity ?? 0);
+        const hargaJualPerMeter = areaTotal > 0 ? Math.round(line.subtotal / areaTotal) : 0;
+
+        items.push({
+          tanggal: this.toWibDateString(order.created_at),
+          no_faktur: order.no_faktur,
+          pelanggan: order.nama_customer,
+          pesanan: `${line.nama_bahan} (${line.panjang} x ${line.lebar} m)`,
+          quantity: line.quantity,
+          harga_jual_per_meter: hargaJualPerMeter,
+          harga_total: line.subtotal,
+          tunai: Math.round(tunaiRaw * ratio),
+          transfer: Math.round(transferRaw * ratio),
+          dp: Math.round(dpRaw * ratio),
+          sisa: Math.round(sisaRaw * ratio),
+        });
+      }
+    }
+
+    const summary = {
+      total_records: items.length,
+      total_quantity: items.reduce((sum, row) => sum + (row.quantity || 0), 0),
+      total_harga_total: items.reduce((sum, row) => sum + (row.harga_total || 0), 0),
+      total_tunai: items.reduce((sum, row) => sum + (row.tunai || 0), 0),
+      total_transfer: items.reduce((sum, row) => sum + (row.transfer || 0), 0),
+      total_dp: items.reduce((sum, row) => sum + (row.dp || 0), 0),
+      total_sisa: items.reduce((sum, row) => sum + (row.sisa || 0), 0),
+    };
+
+    return {
+      items,
+      summary,
+      meta: {
+        from,
+        to,
       },
     };
   }

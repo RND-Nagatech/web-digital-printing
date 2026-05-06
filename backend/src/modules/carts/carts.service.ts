@@ -3,6 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { OrdersService } from '../orders/orders.service';
 import { MaterialsService } from '../materials/materials.service';
+import { SettingsService } from '../settings/settings.service';
 import { CreateOrderDto } from '../orders/dto/create-order.dto';
 import { Cart } from './schemas/cart.schema';
 import { CreateCartDto } from './dto/create-cart.dto';
@@ -14,6 +15,7 @@ export class CartsService {
         @InjectModel(Cart.name) private readonly model: Model<Cart>,
         private readonly ordersService: OrdersService,
         private readonly materialsService: MaterialsService,
+        private readonly settingsService: SettingsService,
     ) { }
 
     async findMy(kodeCustomer: string) {
@@ -86,6 +88,13 @@ export class CartsService {
     }
 
     async create(kodeCustomer: string, dto: CreateCartDto, designFile?: string, paymentProof?: string) {
+        if (dto.payment_method === 'pay_later') {
+            const customerPolicy = await this.settingsService.getOrderPolicyForCustomer(kodeCustomer);
+            if (customerPolicy.can_pay_later === false) {
+                throw new BadRequestException('Metode Bayar Nanti sedang dibatasi sementara karena pembatalan otomatis berulang.');
+            }
+        }
+
         if (dto.payment_method === 'dp' && (!dto.dp_amount || dto.dp_amount <= 0)) {
             throw new BadRequestException('Masukkan jumlah DP');
         }
@@ -163,6 +172,7 @@ export class CartsService {
                     lebar: x.lebar,
                     quantity: x.quantity,
                     mata_ayam: x.mata_ayam,
+                    design_file: x.design_file,
                 })),
                 notes: item.notes,
                 dp_amount: item.payment_method === 'dp' ? item.dp_amount : undefined,

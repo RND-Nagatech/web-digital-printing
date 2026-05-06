@@ -43,8 +43,8 @@ export default function MasterUserPage() {
   const { register, handleSubmit, reset, watch, setValue, formState: { errors } } =
     useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { role: 'kasir', active: true } });
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await userService.getPaged({ page, limit, search });
       if (Array.isArray(res)) {
@@ -61,7 +61,7 @@ export default function MasterUserPage() {
         setTotalPages(1);
       }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -70,7 +70,7 @@ export default function MasterUserPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, search]);
 
-  useAutoRefresh(load, { intervalMs: 10_000 });
+  useAutoRefresh(() => load(true), { intervalMs: 10_000 });
 
   useEffect(() => { setPage(1); }, [search, limit]);
 

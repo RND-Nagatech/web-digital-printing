@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Search, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from 'lucide-react';
 import type { RowInput } from 'jspdf-autotable';
 import { toast } from 'sonner';
@@ -17,7 +17,12 @@ import { exportExcelWithWorker } from './export-engine/excel-worker.client';
 import { useAutoRefresh } from '@/hooks/use-auto-refresh';
 
 const PAGE_SIZE_OPTIONS = ['10', '20', '50'] as const;
-const TODAY = new Date().toISOString().slice(0, 10);
+const getTodayWib = () => {
+  const now = new Date();
+  const wib = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+  return wib.toISOString().slice(0, 10);
+};
+const TODAY = getTodayWib();
 
 function isDetailItem(item: RekapItem | DetailItem): item is DetailItem {
   return 'kategori' in item;
@@ -28,6 +33,10 @@ export default function LaporanPage() {
   const [from, setFrom] = useState(TODAY);
   const [to, setTo] = useState(TODAY);
   const [search, setSearch] = useState('');
+  const [appliedFrom, setAppliedFrom] = useState(TODAY);
+  const [appliedTo, setAppliedTo] = useState(TODAY);
+  const [appliedSearch, setAppliedSearch] = useState('');
+  const [appliedType, setAppliedType] = useState<'rekap' | 'detail'>('detail');
   const [filterError, setFilterError] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -37,11 +46,16 @@ export default function LaporanPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
 
-  const loadReport = async () => {
-    const res = await laporanService.getFinanceReport({ type: viewType, from, to, search: search.trim() || undefined });
+  const loadReport = async (
+    type = appliedType,
+    dateFrom = appliedFrom,
+    dateTo = appliedTo,
+    q = appliedSearch,
+  ) => {
+    const res = await laporanService.getFinanceReport({ type, from: dateFrom, to: dateTo, search: q.trim() || undefined });
     setItems(res.items);
     setSummary(res.summary);
-    setActiveType(viewType);
+    setActiveType(type);
   };
 
   const onSearch = async () => {
@@ -56,9 +70,13 @@ export default function LaporanPage() {
     setFilterError('');
     setLoading(true);
     setSubmitted(true);
+    setAppliedType(viewType);
+    setAppliedFrom(from);
+    setAppliedTo(to);
+    setAppliedSearch(search);
     setPage(1);
     try {
-      await loadReport();
+      await loadReport(viewType, from, to, search);
     } catch {
       toast.error('Gagal memuat laporan');
     } finally {
@@ -70,6 +88,16 @@ export default function LaporanPage() {
     if (!submitted || loading) return;
     await loadReport();
   }, { intervalMs: 10_000, enabled: submitted });
+
+  useEffect(() => {
+    if (!submitted) return;
+    const timer = setTimeout(() => {
+      setAppliedSearch(search);
+      setPage(1);
+      void loadReport(appliedType, appliedFrom, appliedTo, search);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search, submitted, appliedType, appliedFrom, appliedTo]);
 
   const totalItems = items.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / limit));
@@ -261,7 +289,18 @@ export default function LaporanPage() {
       <div className="grid grid-cols-1 gap-3 border-b bg-background px-4 py-4 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
         <div className="relative w-full sm:col-span-2 lg:col-span-3">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Cari deskripsi…" value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 bg-white pl-8" />
+          <Input
+            placeholder="Cari deskripsi…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void onSearch();
+              }
+            }}
+            className="h-10 bg-white pl-8"
+          />
         </div>
         <div className="w-full lg:col-span-2">
           <label className="mb-1 block text-xs text-muted-foreground">Type</label>
@@ -432,4 +471,3 @@ export default function LaporanPage() {
     </Card>
   );
 }
-

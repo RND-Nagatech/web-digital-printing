@@ -61,15 +61,15 @@ export default function MasterBahanPage() {
     defaultValues: { is_active: true },
   });
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const result = await bahanService.getPaged({ page, limit, search });
       setData(result.items);
       setTotal(result.meta.total);
       setTotalPages(result.meta.totalPages);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -78,7 +78,7 @@ export default function MasterBahanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, limit, search]);
 
-  useAutoRefresh(load, { intervalMs: 10_000 });
+  useAutoRefresh(() => load(true), { intervalMs: 10_000 });
 
   useEffect(() => {
     setPage(1);

@@ -48,8 +48,28 @@ export class UsersService {
     });
   }
 
-  findAll() {
-    return this.userModel.find({ status_delete: { $ne: true } }, { password: 0 }).sort({ created_at: -1 }).lean();
+  async findAll(page = 1, limit = 10, search?: string) {
+    const query: Record<string, any> = { status_delete: { $ne: true } };
+    if (search?.trim()) {
+      const re = new RegExp(search.trim(), 'i');
+      query.$or = [{ username: re }, { email: re }, { role: re }];
+    }
+
+    const skip = (page - 1) * limit;
+    const [items, total] = await Promise.all([
+      this.userModel.find(query, { password: 0 }).sort({ created_at: -1 }).skip(skip).limit(limit).lean(),
+      this.userModel.countDocuments(query),
+    ]);
+
+    return {
+      items,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    };
   }
 
   async findOne(id: string) {

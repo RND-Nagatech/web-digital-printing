@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { useDropzone } from 'react-dropzone';
-import { ArrowLeft, UploadCloud, FileIcon, X, Wallet, CreditCard, Clock } from 'lucide-react';
+import { UploadCloud, FileIcon, X, Wallet, CreditCard, Clock } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { bahanService, mataAyamService } from '@/services/master.service';
 import { transaksiService } from '@/services/transaksi.service';
 import { storeService } from '@/services/store.service';
+import { settingsService } from '@/services/settings.service';
 import { Material, Eyelet } from '@/types/material';
 import { formatIDR } from '@/utils/formatters';
 import { cn } from '@/lib/utils';
@@ -30,6 +31,12 @@ const getNotaPdfModule = (): Promise<NotaPdfModule> => {
 };
 
 const blockArrow = (e: React.KeyboardEvent) => { if (['ArrowUp', 'ArrowDown'].includes(e.key)) e.preventDefault(); };
+const sanitizeDecimal = (value: string) => {
+  const cleaned = value.replace(/[^0-9.]/g, '');
+  const [head, ...tail] = cleaned.split('.');
+  return tail.length > 0 ? `${head}.${tail.join('')}` : head;
+};
+const sanitizeInteger = (value: string) => value.replace(/[^0-9]/g, '');
 
 const schema = z.object({
   nama_customer: z.string().trim().min(2).max(100),
@@ -53,12 +60,6 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
-const PAYMENT_OPTIONS = [
-  { value: 'pay_now' as const, title: 'Bayar Penuh', desc: 'Pilih transfer atau tunai.', Icon: Wallet },
-  { value: 'dp' as const, title: 'Bayar DP', desc: 'Pilih transfer atau tunai, sisa sebelum diambil.', Icon: CreditCard },
-  { value: 'pay_later' as const, title: 'Bayar Nanti', desc: 'Simpan dulu, bayar maks 1×24 jam.', Icon: Clock },
-];
-
 export default function TransaksiBaruPage() {
   const navigate = useNavigate();
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -71,19 +72,41 @@ export default function TransaksiBaruPage() {
     quantity: number;
     mata_ayam?: string;
     subtotal: number;
+    designFile?: File;
   }>>([]);
   const [proofFile, setProofFile] = useState<File | undefined>();
   const [proofPreview, setProofPreview] = useState<string | undefined>();
+  const [itemPreviewUrls, setItemPreviewUrls] = useState<Record<number, string>>({});
   const [dpDisplay, setDpDisplay] = useState('');
+  const [unpaidExpiryHours, setUnpaidExpiryHours] = useState(24);
 
   const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { nama_customer: '', no_hp: '', alamat: '', kode_bahan: '', panjang: 1, lebar: 1, quantity: 1, mata_ayam: 'none', payment_method: undefined as unknown as 'pay_now' | 'dp' | 'pay_later', payment_channel: undefined },
+    defaultValues: {
+      nama_customer: '',
+      no_hp: '',
+      alamat: '',
+      kode_bahan: '',
+      panjang: undefined as unknown as number,
+      lebar: undefined as unknown as number,
+      quantity: undefined as unknown as number,
+      mata_ayam: 'none',
+      payment_method: undefined as unknown as 'pay_now' | 'dp' | 'pay_later',
+      payment_channel: undefined,
+    },
   });
 
   const paymentMethod = watch('payment_method');
   const paymentChannel = watch('payment_channel');
   const needsProof = (paymentMethod === 'pay_now' || paymentMethod === 'dp') && paymentChannel === 'transfer';
+  const paymentOptions = useMemo(
+    () => [
+      { value: 'pay_now' as const, title: 'Bayar Penuh', desc: 'Pilih transfer atau tunai.', Icon: Wallet },
+      { value: 'dp' as const, title: 'Bayar DP', desc: 'Pilih transfer atau tunai, sisa sebelum diambil.', Icon: CreditCard },
+      { value: 'pay_later' as const, title: 'Bayar Nanti', desc: `Simpan dulu, bayar maks ${unpaidExpiryHours} jam.`, Icon: Clock },
+    ],
+    [unpaidExpiryHours],
+  );
 
   useEffect(() => {
     Promise.all([bahanService.getAll(), mataAyamService.getAll()]).then(([m, e]) => {
@@ -94,6 +117,18 @@ export default function TransaksiBaruPage() {
   }, [setValue]);
 
   useEffect(() => {
+    void settingsService.getOrderPolicyPublic()
+      .then((policy) => {
+        if (policy?.unpaid_expiry_hours && policy.unpaid_expiry_hours > 0) {
+          setUnpaidExpiryHours(policy.unpaid_expiry_hours);
+        }
+      })
+      .catch(() => {
+        setUnpaidExpiryHours(24);
+      });
+  }, []);
+
+  useEffect(() => {
     if (proofFile && proofFile.type.startsWith('image/')) {
       const url = URL.createObjectURL(proofFile);
       setProofPreview(url);
@@ -101,6 +136,22 @@ export default function TransaksiBaruPage() {
     }
     setProofPreview(undefined);
   }, [proofFile]);
+
+  useEffect(() => {
+    const previews: Record<number, string> = {};
+    const urls: string[] = [];
+    orderItems.forEach((item, idx) => {
+      if (item.designFile && item.designFile.type.startsWith('image/')) {
+        const url = URL.createObjectURL(item.designFile);
+        previews[idx] = url;
+        urls.push(url);
+      }
+    });
+    setItemPreviewUrls(previews);
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [orderItems]);
 
   useEffect(() => {
     if (paymentMethod !== 'dp') { setDpDisplay(''); setValue('dp_amount', undefined); }
@@ -164,6 +215,7 @@ export default function TransaksiBaruPage() {
         quantity,
         mata_ayam: mata_ayam === 'none' ? '' : mata_ayam,
         subtotal,
+        designFile: undefined,
       },
     ]);
     toast.success('Item ditambahkan');
@@ -173,10 +225,28 @@ export default function TransaksiBaruPage() {
     setOrderItems((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const setItemDesign = (idx: number, file?: File) => {
+    if (!file) return;
+    const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'application/zip', 'application/x-zip-compressed'];
+    if (!allowed.includes(file.type) && !file.name.toLowerCase().endsWith('.zip')) {
+      toast.error('Format design harus PDF, JPG, PNG, atau ZIP');
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error('Ukuran design maksimal 50MB');
+      return;
+    }
+    setOrderItems((prev) => prev.map((item, i) => (i === idx ? { ...item, designFile: file } : item)));
+  };
+
   const onSubmit = async (form: FormData) => {
     try {
       if (needsProof && !proofFile) {
         toast.error('Upload bukti transfer terlebih dahulu');
+        return;
+      }
+      if (orderItems.length > 0 && orderItems.some((item) => !item.designFile)) {
+        toast.error('Setiap item pesanan wajib upload design');
         return;
       }
 
@@ -187,6 +257,7 @@ export default function TransaksiBaruPage() {
           lebar: item.lebar,
           quantity: item.quantity,
           mata_ayam: item.mata_ayam,
+          design_file: '',
         }))
         : [{
           kode_bahan: form.kode_bahan,
@@ -206,7 +277,13 @@ export default function TransaksiBaruPage() {
         lebar: itemsPayload[0]?.lebar,
         quantity: itemsPayload[0]?.quantity,
       };
-      const order = await transaksiService.create(payload, needsProof && proofFile ? { proofFile } : undefined);
+      const designFiles = orderItems.length > 0
+        ? orderItems.map((item) => item.designFile as File)
+        : [];
+      const order = await transaksiService.create(payload, {
+        ...(needsProof && proofFile ? { proofFile } : {}),
+        ...(designFiles.length > 0 ? { designFiles } : {}),
+      });
       const notaPdf = await getNotaPdfModule();
       const [store, logoDataUrl, lunasDataUrl, belumLunasDataUrl] = await Promise.all([
         storeService.getReportHeader(),
@@ -222,7 +299,7 @@ export default function TransaksiBaruPage() {
         watermarkDataUrl,
       });
       toast.success('Transaksi dibuat');
-      navigate('/transaksi');
+      navigate('/transaksi/daftar');
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Gagal');
     }
@@ -234,9 +311,6 @@ export default function TransaksiBaruPage() {
         <CardHeader className="rounded-none bg-slate-800 px-6 py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-xl font-semibold text-white m-0">Transaksi Baru</CardTitle>
-            <Button onClick={() => navigate(-1)} className="h-11 w-full px-6 gradient-primary text-primary-foreground shadow-glow hover:opacity-95 sm:w-auto">
-              <ArrowLeft className="mr-2 h-4 w-4" />Kembali
-            </Button>
           </div>
         </CardHeader>
       </Card>
@@ -263,17 +337,44 @@ export default function TransaksiBaruPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Panjang (m)</Label>
-                <Input inputMode="decimal" onKeyDown={blockArrow} {...register('panjang')} />
+                <Input
+                  inputMode="decimal"
+                  placeholder="Silahkan input panjang (meter)"
+                  onKeyDown={blockArrow}
+                  onInput={(e) => {
+                    const target = e.currentTarget;
+                    target.value = sanitizeDecimal(target.value);
+                  }}
+                  {...register('panjang')}
+                />
                 {errors.panjang && <p className="text-xs text-destructive">{errors.panjang.message}</p>}
               </div>
               <div className="space-y-1.5">
                 <Label>Lebar (m)</Label>
-                <Input inputMode="decimal" onKeyDown={blockArrow} {...register('lebar')} />
+                <Input
+                  inputMode="decimal"
+                  placeholder="Silahkan input lebar (meter)"
+                  onKeyDown={blockArrow}
+                  onInput={(e) => {
+                    const target = e.currentTarget;
+                    target.value = sanitizeDecimal(target.value);
+                  }}
+                  {...register('lebar')}
+                />
                 {errors.lebar && <p className="text-xs text-destructive">{errors.lebar.message}</p>}
               </div>
               <div className="space-y-1.5">
                 <Label>Qty</Label>
-                <Input inputMode="numeric" onKeyDown={blockArrow} {...register('quantity')} />
+                <Input
+                  inputMode="numeric"
+                  placeholder="Silahkan input quantity"
+                  onKeyDown={blockArrow}
+                  onInput={(e) => {
+                    const target = e.currentTarget;
+                    target.value = sanitizeInteger(target.value);
+                  }}
+                  {...register('quantity')}
+                />
                 {errors.quantity && <p className="text-xs text-destructive">{errors.quantity.message}</p>}
               </div>
               <div className="space-y-1.5">
@@ -293,14 +394,53 @@ export default function TransaksiBaruPage() {
                 <div className="space-y-2 sm:col-span-2 rounded-lg border bg-muted/30 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Daftar Item</p>
                   {orderItems.map((item, idx) => (
-                    <div key={`${item.kode_bahan}-${idx}`} className="flex items-center justify-between rounded-md border bg-background px-3 py-2 text-sm">
-                      <div>
+                    <div key={`${item.kode_bahan}-${idx}`} className="rounded-md border bg-background px-3 py-3 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
                         <p className="font-medium">{item.nama_bahan}</p>
                         <p className="text-xs text-muted-foreground">{item.panjang} x {item.lebar} m • Qty {item.quantity}{item.mata_ayam ? ` • ${item.mata_ayam}` : ''}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{formatIDR(item.subtotal)}</span>
+                          <Button type="button" size="sm" className="bg-red-600 text-white hover:bg-red-700" onClick={() => removeItem(idx)}>Hapus</Button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold">{formatIDR(item.subtotal)}</span>
-                        <Button type="button" size="sm" className="bg-red-600 text-white hover:bg-red-700" onClick={() => removeItem(idx)}>Hapus</Button>
+                      <div className="mt-3">
+                        <Label className="mb-1.5 block text-xs">Upload Design Item</Label>
+                        {!item.designFile ? (
+                          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-3 py-3 text-xs hover:border-primary/50">
+                            <UploadCloud className="h-4 w-4 text-primary" />
+                            <span>Pilih file design (PDF/JPG/PNG/ZIP, maks 50MB)</span>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept=".pdf,.jpg,.jpeg,.png,.zip"
+                              onChange={(e) => setItemDesign(idx, e.target.files?.[0])}
+                            />
+                          </label>
+                        ) : (
+                          <div className="flex items-center gap-3 rounded-lg border bg-muted/30 px-3 py-2">
+                            {itemPreviewUrls[idx] ? (
+                              <img src={itemPreviewUrls[idx]} alt="design preview" className="h-12 w-12 rounded object-cover" />
+                            ) : (
+                              <div className="flex h-12 w-12 items-center justify-center rounded bg-primary/10">
+                                <FileIcon className="h-5 w-5 text-primary" />
+                              </div>
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-medium">{item.designFile.name}</p>
+                              <p className="text-[11px] text-muted-foreground">{(item.designFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => setOrderItems((prev) => prev.map((it, i) => (i === idx ? { ...it, designFile: undefined } : it)))}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -316,7 +456,7 @@ export default function TransaksiBaruPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-3">
-                {PAYMENT_OPTIONS.map(({ value, title, desc, Icon }) => {
+                {paymentOptions.map(({ value, title, desc, Icon }) => {
                   const active = paymentMethod === value;
                   return (
                     <button key={value} type="button"
@@ -414,4 +554,3 @@ export default function TransaksiBaruPage() {
     </div>
   );
 }
-

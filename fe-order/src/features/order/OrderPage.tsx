@@ -2,7 +2,7 @@ import { FormProvider, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart } from 'lucide-react';
+import { FileIcon, ShoppingCart, UploadCloud, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { orderFormSchema, type OrderFormValues } from './orderSchema';
 import { useOrderStore } from '@/store/orderStore';
@@ -11,7 +11,6 @@ import { FormSection } from './components/FormSection';
 import { MaterialSection } from './components/MaterialSection';
 import { SizeSection } from './components/SizeSection';
 import { OptionsSection } from './components/OptionsSection';
-import { DesignUploadSection } from './components/DesignUploadSection';
 import { NotesSection } from './components/NotesSection';
 import { PaymentSection } from './components/PaymentSection';
 import { OrderSummary } from './components/OrderSummary';
@@ -21,9 +20,13 @@ import { useNavigate } from 'react-router-dom';
 import { CartService } from '@/services/cart.service';
 
 export const OrderPage = () => {
+  const MAX_DESIGN_SIZE = 50 * 1024 * 1024;
+  const ACCEPTED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'application/zip'];
   const navigate = useNavigate();
   const authUser = useAuthStore((s) => s.user);
   const addToCartButtonRef = useRef<HTMLButtonElement | null>(null);
+  const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const [itemPreviewUrls, setItemPreviewUrls] = useState<Record<number, string>>({});
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [orderItems, setOrderItems] = useState<Array<{
     materialId: string;
@@ -34,6 +37,7 @@ export const OrderPage = () => {
     quantity: number;
     mataAyamLabel?: string;
     subtotal: number;
+    designFile?: File;
   }>>([]);
   const methods = useForm<OrderFormValues>({
     resolver: zodResolver(orderFormSchema),
@@ -44,9 +48,9 @@ export const OrderPage = () => {
       customerEmail: '',
       address: '',
       materialId: '',
-      panjang: 0,
-      lebar: 0,
-      quantity: 1,
+      panjang: undefined as unknown as number,
+      lebar: undefined as unknown as number,
+      quantity: undefined as unknown as number,
       mataAyamId: 'none',
       notes: '',
       paymentMethod: 'pay_later',
@@ -55,7 +59,7 @@ export const OrderPage = () => {
 
   const {
     selectedMaterial, selectedOption, panjang, lebar, quantity,
-    designFile, proofFile, reset,
+    proofFile, reset,
   } = useOrderStore();
 
   const total = useMemo(
@@ -67,9 +71,10 @@ export const OrderPage = () => {
     return orderItems.reduce((sum, item) => sum + item.subtotal, 0);
   }, [orderItems, total]);
 
-  const isFormValid = methods.formState.isValid && !!designFile && total > 0;
+  const isFormValid = methods.formState.isValid && total > 0;
   const hasOrderItems = orderItems.length > 0;
-  const canAddToCart = isFormValid && hasOrderItems && !isAddingToCart;
+  const hasAllItemDesigns = hasOrderItems && orderItems.every((item) => !!item.designFile);
+  const canAddToCart = isFormValid && hasOrderItems && hasAllItemDesigns && !isAddingToCart;
 
   useEffect(() => {
     if (!authUser) return;
@@ -78,6 +83,22 @@ export const OrderPage = () => {
     methods.setValue('customerEmail', authUser.email, { shouldValidate: true });
     methods.setValue('address', authUser.alamat, { shouldValidate: true });
   }, [authUser, methods]);
+
+  useEffect(() => {
+    const nextUrls: Record<number, string> = {};
+    const allocated: string[] = [];
+    orderItems.forEach((item, idx) => {
+      if (item.designFile && item.designFile.type.startsWith('image/')) {
+        const url = URL.createObjectURL(item.designFile);
+        nextUrls[idx] = url;
+        allocated.push(url);
+      }
+    });
+    setItemPreviewUrls(nextUrls);
+    return () => {
+      allocated.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [orderItems]);
 
   const runFlyToCartAnimation = () => {
     const source = addToCartButtonRef.current;
@@ -117,8 +138,8 @@ export const OrderPage = () => {
       toast({ title: 'Tambah item dulu ke nota', description: 'Silakan klik "Tambah Item ke Nota" sebelum menambahkan ke keranjang.', variant: 'destructive' });
       return;
     }
-    if (!designFile) {
-      toast({ title: 'Design wajib diupload', variant: 'destructive' });
+    if (!hasAllItemDesigns) {
+      toast({ title: 'Design per item wajib diupload', variant: 'destructive' });
       return;
     }
     if (values.paymentMethod === 'pay_now' && !proofFile) {
@@ -156,7 +177,7 @@ export const OrderPage = () => {
           dpAmount: values.dpAmount,
         },
         total: finalTotal,
-        designFile,
+        designFiles: orderItems.map((item) => item.designFile).filter((x): x is File => !!x),
         proofFile,
       });
 
@@ -204,6 +225,23 @@ export const OrderPage = () => {
     setOrderItems((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const onUploadItemDesign = (idx: number, file?: File) => {
+    if (!file) return;
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      toast({ title: 'Format design tidak didukung', description: 'Gunakan PDF/JPG/PNG/ZIP', variant: 'destructive' });
+      return;
+    }
+    if (file.size > MAX_DESIGN_SIZE) {
+      toast({ title: 'Ukuran maksimal 50MB', variant: 'destructive' });
+      return;
+    }
+    setOrderItems((prev) => prev.map((item, i) => (i === idx ? { ...item, designFile: file } : item)));
+  };
+
+  const removeItemDesign = (idx: number) => {
+    setOrderItems((prev) => prev.map((item, i) => (i === idx ? { ...item, designFile: undefined } : item)));
+  };
+
   return (
     <FormProvider {...methods}>
       <div className="mb-8">
@@ -240,18 +278,57 @@ export const OrderPage = () => {
                       <span className="font-semibold">{formatIDR(item.subtotal)}</span>
                       <Button type="button" size="sm" className="bg-red-600 text-white hover:bg-red-700" onClick={() => removeItem(idx)}>Hapus</Button>
                     </div>
+                    <div className="w-full">
+                      <input
+                        ref={(el) => { fileInputRefs.current[idx] = el; }}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.zip"
+                        className="hidden"
+                        onChange={(e) => onUploadItemDesign(idx, e.target.files?.[0])}
+                      />
+                      {!item.designFile ? (
+                        <button
+                          type="button"
+                          className="flex w-full cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-border p-4 text-center transition-colors hover:border-primary/50"
+                          onClick={() => fileInputRefs.current[idx]?.click()}
+                        >
+                          <UploadCloud className="mb-1.5 h-7 w-7 text-primary" />
+                          <p className="text-xs font-medium">Upload design item</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">PDF, JPG, PNG, ZIP — maks 50MB</p>
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-3 rounded-xl border border-border bg-secondary/40 p-3 animate-scale-in">
+                          {itemPreviewUrls[idx] ? (
+                            <img src={itemPreviewUrls[idx]} alt="preview design" className="h-16 w-16 rounded-lg object-cover" />
+                          ) : (
+                            <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-primary/10">
+                              <FileIcon className="h-7 w-7 text-primary" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{item.designFile.name}</p>
+                            <p className="text-xs text-muted-foreground">{(item.designFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeItemDesign(idx)}
+                            className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                            aria-label="Hapus design item"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
-          <FormSection step={4} title="Upload Design" description="File akhir yang akan dicetak.">
-            <DesignUploadSection />
-          </FormSection>
-          <FormSection step={5} title="Catatan" description="Instruksi khusus untuk tim produksi (opsional).">
+          <FormSection step={4} title="Catatan" description="Instruksi khusus untuk tim produksi (opsional).">
             <NotesSection />
           </FormSection>
-          <FormSection step={6} title="Data & Pembayaran" description="Pilih metode pembayaran yang sesuai.">
+          <FormSection step={5} title="Data & Pembayaran" description="Pilih metode pembayaran yang sesuai.">
             <PaymentSection />
           </FormSection>
         </div>
@@ -274,9 +351,9 @@ export const OrderPage = () => {
               Silahkan klik tambah item untuk menambahkan ke keranjang.
             </p>
           )}
-          {hasOrderItems && !isFormValid && (
+          {hasOrderItems && (!isFormValid || !hasAllItemDesigns) && (
             <p className="mt-2 text-center text-xs text-muted-foreground">
-              Lengkapi semua field & upload design untuk menambahkan ke keranjang
+              Lengkapi semua field & upload design tiap item untuk menambahkan ke keranjang
             </p>
           )}
         </aside>

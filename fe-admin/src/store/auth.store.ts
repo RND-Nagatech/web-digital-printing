@@ -68,9 +68,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     // Report sub-menu keys: use explicit menu permissions when configured,
     // otherwise fall back to legacy reports:read behavior.
-    if (key === 'menu:laporan:keuangan' || key === 'menu:laporan:managerial') {
+    if (key === 'menu:laporan:keuangan' || key === 'menu:laporan:managerial' || key === 'menu:laporan:transaksi-penjualan') {
       const hasExplicitLaporanMenu =
-        permissions.has('menu:laporan:keuangan') || permissions.has('menu:laporan:managerial');
+        permissions.has('menu:laporan:keuangan')
+        || permissions.has('menu:laporan:managerial')
+        || permissions.has('menu:laporan:transaksi-penjualan');
       if (hasExplicitLaporanMenu) return permissions.has(key);
       return permissions.has('reports:read');
     }
@@ -79,6 +81,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       return (
         permissions.has('menu:laporan:keuangan') ||
         permissions.has('menu:laporan:managerial') ||
+        permissions.has('menu:laporan:transaksi-penjualan') ||
         permissions.has('reports:read')
       );
     }

@@ -64,7 +64,7 @@ export const MainLayout = ({ children }: Props) => {
           </Link>
 
           <div className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
-            <span className="flex items-center gap-1.5"><ShieldCheck className="h-4 w-4 text-success" /> Pembayaran Aman</span>
+
 
           </div>
 
