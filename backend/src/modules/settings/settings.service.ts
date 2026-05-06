@@ -5,6 +5,7 @@ import { Observable, Subject } from 'rxjs';
 import { UpdateOrderPolicyDto } from './dto/update-order-policy.dto';
 import { OrderPolicy } from './schemas/order-policy.schema';
 import { Order } from '../orders/schemas/order.schema';
+import { OrderStatus } from '../../common/enums/order-status.enum';
 
 export type OrderPolicyConfig = {
   max_unpaid_orders: number;
@@ -16,6 +17,7 @@ export type OrderPolicyConfig = {
   updated_date?: string;
   can_pay_later?: boolean;
   pay_later_suspended_until?: string | null;
+  unpaid_open_orders?: number;
 };
 
 const DEFAULT_POLICY: OrderPolicyConfig = {
@@ -93,13 +95,21 @@ export class SettingsService {
   async getOrderPolicyForCustomer(kodeCustomer?: string) {
     const base = await this.getOrderPolicy();
     if (!kodeCustomer) {
-      return { ...base, can_pay_later: true, pay_later_suspended_until: null };
+      return { ...base, can_pay_later: true, pay_later_suspended_until: null, unpaid_open_orders: 0 };
     }
     const suspend = await this.getPayLaterSuspensionInfo(kodeCustomer, base);
+    const unpaidOpenOrders = await this.orderModel.countDocuments({
+      kode_customer: kodeCustomer,
+      payment_status: 'unpaid',
+      status: { $nin: [OrderStatus.CANCELLED, OrderStatus.SELESAI] },
+    });
+    const withinUnpaidLimit = base.max_unpaid_orders <= 0 || unpaidOpenOrders < base.max_unpaid_orders;
+    const canPayLater = suspend.canPayLater && withinUnpaidLimit;
     return {
       ...base,
-      can_pay_later: suspend.canPayLater,
-      pay_later_suspended_until: suspend.suspendedUntil,
+      can_pay_later: canPayLater,
+      pay_later_suspended_until: canPayLater ? null : suspend.suspendedUntil,
+      unpaid_open_orders: unpaidOpenOrders,
     } satisfies OrderPolicyConfig;
   }
 

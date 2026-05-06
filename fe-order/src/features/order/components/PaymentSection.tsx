@@ -17,6 +17,8 @@ export const PaymentSection = () => {
   const [unpaidExpiryHours, setUnpaidExpiryHours] = useState(24);
   const [canPayLater, setCanPayLater] = useState(true);
   const [suspendedUntil, setSuspendedUntil] = useState<string | null>(null);
+  const [maxUnpaidOrders, setMaxUnpaidOrders] = useState<number>(0);
+  const [unpaidOpenOrders, setUnpaidOpenOrders] = useState<number>(0);
   const proofFile = useOrderStore((s) => s.proofFile);
   const setProofFile = useOrderStore((s) => s.setProofFile);
   const [proofPreview, setProofPreview] = useState<string | undefined>();
@@ -58,11 +60,15 @@ export const PaymentSection = () => {
         }
         setCanPayLater(policy?.can_pay_later !== false);
         setSuspendedUntil(policy?.pay_later_suspended_until ?? null);
+        setMaxUnpaidOrders(policy?.max_unpaid_orders ?? 0);
+        setUnpaidOpenOrders(policy?.unpaid_open_orders ?? 0);
       })
       .catch(() => {
         setUnpaidExpiryHours(24);
         setCanPayLater(true);
         setSuspendedUntil(null);
+        setMaxUnpaidOrders(0);
+        setUnpaidOpenOrders(0);
       });
   }, []);
 
@@ -145,8 +151,11 @@ export const PaymentSection = () => {
 
       {!canPayLater && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          Metode Bayar Nanti sementara tidak tersedia
-          {suspendedUntil ? ` sampai ${new Date(suspendedUntil).toLocaleString('id-ID')}` : ''}.
+          {suspendedUntil
+            ? `Metode Bayar Nanti sementara tidak tersedia sampai ${new Date(suspendedUntil).toLocaleString('id-ID')}.`
+            : (maxUnpaidOrders > 0 && unpaidOpenOrders >= maxUnpaidOrders
+              ? `Metode Bayar Nanti sementara tidak tersedia karena Anda memiliki ${unpaidOpenOrders} pesanan belum dibayar.`
+              : 'Metode Bayar Nanti sementara tidak tersedia.')}
         </div>
       )}
 

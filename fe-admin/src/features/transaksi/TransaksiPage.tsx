@@ -92,13 +92,13 @@ export default function TransaksiPage() {
 
   useEffect(() => {
     if (!submitted) return;
+    if (searchFilter === appliedSearch) return;
     const timer = setTimeout(() => {
       setAppliedSearch(searchFilter);
       setPage(1);
-      setReloadKey((x) => x + 1);
     }, 350);
     return () => clearTimeout(timer);
-  }, [searchFilter, submitted]);
+  }, [searchFilter, appliedSearch, submitted]);
   useAutoRefresh(() => load(true), { intervalMs: 10_000, enabled: submitted });
   useEffect(() => { setPage(1); }, [limit, appliedStatus, appliedPayment, appliedStartDate, appliedEndDate]);
   useEffect(() => {

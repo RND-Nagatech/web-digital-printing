@@ -67,7 +67,7 @@ export default function PengaturanPage() {
   };
 
   return (
-    <Card className="overflow-hidden border border-border/70 shadow-card">
+    <Card className="border-border-/70 overflow-hidden border shadow-card">
       <CardHeader className="rounded-none bg-slate-800 px-6 py-4">
         <CardTitle className="text-xl font-semibold text-white">Pengaturan Pesanan</CardTitle>
       </CardHeader>
@@ -75,7 +75,7 @@ export default function PengaturanPage() {
       <CardContent className="space-y-6 p-6">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Maksimal Pesanan Belum Dibayar per Customer</Label>
+            <Label>Batas Penggunaan Bayar Nanti per Customer</Label>
             <Input
               type="number"
               min={0}
@@ -95,7 +95,7 @@ export default function PengaturanPage() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Batas Auto-Cancel Berturut-turut (Kali)</Label>
+            <Label>Jumlah Pembatalan Otomatis Sebelum Bayar Nanti Dibatasi (Kali)</Label>
             <Input
               type="number"
               min={1}

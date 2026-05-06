@@ -85,6 +85,10 @@ const App = () => {
 
     void check();
     const stream = new EventSource(streamUrl);
+    stream.onopen = () => {
+      // Sinkronisasi cepat setelah koneksi SSE aktif/reconnect
+      void check();
+    };
     stream.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data) as { updated_date?: string };
@@ -98,8 +102,12 @@ const App = () => {
         // ignore malformed event payload
       }
     };
+    stream.onerror = () => {
+      // Jika SSE bermasalah, fallback checker tetap cepat menangkap perubahan.
+      void check();
+    };
 
-    const fallbackId = window.setInterval(() => { void check(); }, 60000);
+    const fallbackId = window.setInterval(() => { void check(); }, 5000);
     return () => {
       window.clearInterval(fallbackId);
       stream.close();

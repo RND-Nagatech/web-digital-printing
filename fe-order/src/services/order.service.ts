@@ -5,11 +5,13 @@ type ApiWrap<T> = { success: boolean; message: string; data: T };
 type Paged<T> = { items: T[]; meta: { page: number; limit: number; total: number; totalPages: number } };
 type OrderPolicyDto = {
     unpaid_expiry_hours: number;
+    max_unpaid_orders?: number;
     allow_process_unpaid?: boolean;
     allow_process_dp?: boolean;
     updated_date?: string;
     can_pay_later?: boolean;
     pay_later_suspended_until?: string | null;
+    unpaid_open_orders?: number;
 };
 
 type OrderItemDto = {
